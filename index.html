@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ostrich — Sprint ligne droite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-page:#F6EEDF;
+    --card-bg:#FFFBF3;
+    --ink:#221F2C;
+    --ink-soft:#4A4658;
+    --text-secondary:#8A8172;
+    --border:rgba(34,31,44,0.12);
+    --pink:#E68C82;
+    --pink-dark:#B85A50;
+    --pink-tint:#FBE2DC;
+    --gold:#F0A93A;
+    --gold-dark:#B9701C;
+    --sage:#8FB48E;
+    --sage-tint:#E4EFDF;
+    --track:#F1E9DA;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;overscroll-behavior:none;}
+  body{
+    background:var(--bg-page);
+    font-family:'Nunito',sans-serif;
+    display:flex;justify-content:center;align-items:center;
+    min-height:100%;
+    touch-action:none;
+    padding:16px;
+  }
+  #app{
+    position:relative;
+    width:100%;max-width:400px;
+    aspect-ratio:9/16;
+    background:var(--card-bg);
+    border-radius:24px;
+    overflow:hidden;
+    box-shadow:0 16px 40px -20px rgba(34,31,44,.4);
+    border:1px solid var(--border);
+  }
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+
+  .overlay{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:28px;text-align:center;
+    background:linear-gradient(180deg,#FBF3E4,#F3E4CE);
+  }
+  .hidden{display:none !important;}
+  h1{font-family:'Fredoka',sans-serif;font-size:26px;color:var(--ink);margin:0 0 4px;}
+  .subtitle{font-size:13px;color:var(--text-secondary);margin:0 0 22px;font-weight:700;}
+  .trait-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;margin-bottom:16px;}
+  .trait-btn{
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
+    padding:14px 8px;border-radius:16px;border:2px solid var(--border);
+    background:#fff;color:var(--ink-soft);cursor:pointer;
+  }
+  .trait-btn.selected{border-color:var(--pink-dark);background:var(--pink-tint);color:var(--pink-dark);}
+  .match-badge{
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;
+    padding:6px 14px;border-radius:999px;margin-bottom:20px;
+  }
+  .match-bon{background:var(--sage-tint);color:#3E6B44;}
+  .match-neutre{background:var(--track);color:var(--text-secondary);}
+  .match-mauvais{background:#F7DCD6;color:var(--pink-dark);}
+  .reroll{font-size:11px;color:var(--text-secondary);text-decoration:underline;background:none;border:none;cursor:pointer;margin:-12px 0 20px;font-weight:700;font-family:'Nunito',sans-serif;}
+  .big-btn{
+    font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;
+    background:var(--gold);color:#5A3607;border:none;border-radius:16px;
+    padding:14px 40px;cursor:pointer;box-shadow:0 6px 0 var(--gold-dark);
+  }
+  .big-btn:active{transform:translateY(3px);box-shadow:0 3px 0 var(--gold-dark);}
+  .hint{font-size:11px;color:var(--text-secondary);margin-top:16px;font-weight:700;line-height:1.6;}
+
+  .hud{
+    position:absolute;top:0;left:0;right:0;padding:12px 14px;
+    display:flex;flex-direction:column;gap:6px;z-index:5;pointer-events:none;
+  }
+  .hud-row{display:flex;align-items:center;gap:8px;}
+  .hud-track{flex:1;height:8px;background:rgba(34,31,44,.18);border-radius:999px;overflow:hidden;}
+  .hud-fill{height:100%;border-radius:999px;background:var(--gold);}
+  .stamina-fill{height:100%;border-radius:999px;background:var(--pink);}
+  .hud-label{font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);width:52px;}
+
+  #result{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(246,238,223,.97);padding:28px;text-align:center;
+  }
+  .rank-list{width:100%;margin:16px 0 22px;display:flex;flex-direction:column;gap:8px;}
+  .rank-row{
+    display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--border);
+    border-radius:14px;padding:10px 14px;font-weight:800;font-size:14px;color:var(--ink-soft);
+  }
+  .rank-row.me{border-color:var(--pink-dark);background:var(--pink-tint);color:var(--pink-dark);}
+  .rank-pos{width:22px;font-family:'Fredoka',sans-serif;color:var(--gold-dark);}
+  .rank-gain{margin-left:auto;font-size:12px;color:var(--sage);}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="race"></canvas>
+
+  <!-- Écran de sélection -->
+  <div id="start" class="overlay">
+    <h1>Sprint ligne droite</h1>
+    <p class="subtitle">Savane · Type 1 · Choisis ton autruche</p>
+    <div class="trait-grid" id="traitGrid"></div>
+    <div class="match-badge" id="matchBadge"></div>
+    <button class="reroll" id="rerollBtn">🎲 relancer le matching</button>
+    <button class="big-btn" id="startBtn">C'est parti !</button>
+    <p class="hint">Tape à un rythme régulier pour accélérer · Glisse le doigt pour te déplacer · Swipe vers le bas pour sprinter</p>
+  </div>
+
+  <!-- HUD course -->
+  <div class="hud hidden" id="hud">
+    <div class="hud-row">
+      <span class="hud-label">Course</span>
+      <div class="hud-track"><div class="hud-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">Capital</span>
+      <div class="hud-track"><div class="stamina-fill" id="staminaFill" style="width:100%"></div></div>
+    </div>
+  </div>
+
+  <!-- Résultats -->
+  <div id="result" class="overlay hidden">
+    <h1>Arrivée !</h1>
+    <p class="subtitle" id="resultSubtitle"></p>
+    <div class="rank-list" id="rankList"></div>
+    <button class="big-btn" id="replayBtn">Retenter la course</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ---------- Constantes de jeu ---------- */
+  const TRACK_LENGTH   = 17000;
+  const BASE_SPEED     = 110;
+  const MAX_SPEED      = 270;
+  const REST_SPEED     = 95;
+
+  const TRAITS = ["Ambitieuse","Craintive","Calme","Impulsive"];
+  const MATCHES = ["bon","neutre","mauvais"];
+  const PAYOUTS = [120,70,40,20,5]; // en Picaillons, selon classement
+
+  const COLORS = {
+    player:  {body:"#E68C82", ruff:"#F1E6D4", dark:"#221F2C"},
+    ai:[
+      {body:"#7FA8B8", ruff:"#EFE7DA", dark:"#2A3A40"},
+      {body:"#C7A6E0", ruff:"#F1E6D4", dark:"#332B3B"},
+      {body:"#E0B25A", ruff:"#F6EFD9", dark:"#3A2E15"},
+      {body:"#8FB48E", ruff:"#EFE9D6", dark:"#243424"}
+    ]
+  };
+
+  /* ---------- État ---------- */
+  let chosenTrait = TRAITS[0];
+  let chosenMatch = "bon";
+  let racers = [];
+  let raceRunning = false;
+  let raceFinished = false;
+  let elapsedTime = 0;
+  let lastTs = 0;
+  let bgScroll = 0;
+  let shake = 0;
+
+  /* ---------- Canvas ---------- */
+  const canvas = document.getElementById("race");
+  const ctx = canvas.getContext("2d");
+  const app = document.getElementById("app");
+  let W = 0, H = 0;
+
+  function resize(){
+    const r = app.getBoundingClientRect();
+    W = canvas.width = r.width;
+    H = canvas.height = r.height;
+  }
+  window.addEventListener("resize", resize);
+
+  /* ---------- UI: sélection du trait ---------- */
+  const traitGrid = document.getElementById("traitGrid");
+  const matchBadge = document.getElementById("matchBadge");
+
+  function renderTraitGrid(){
+    traitGrid.innerHTML = "";
+    TRAITS.forEach(t => {
+      const b = document.createElement("button");
+      b.className = "trait-btn" + (t === chosenTrait ? " selected" : "");
+      b.textContent = t;
+      b.onclick = () => { chosenTrait = t; renderTraitGrid(); };
+      traitGrid.appendChild(b);
+    });
+  }
+  function renderMatchBadge(){
+    matchBadge.className = "match-badge match-" + chosenMatch;
+    const label = {bon:"✨ Bon matching", neutre:"Matching neutre", mauvais:"⚠ Mauvais matching"}[chosenMatch];
+    matchBadge.textContent = label;
+  }
+  document.getElementById("rerollBtn").onclick = () => {
+    chosenMatch = MATCHES[Math.floor(Math.random()*MATCHES.length)];
+    renderMatchBadge();
+  };
+  renderTraitGrid();
+  renderMatchBadge();
+
+  /* ---------- Modèle Ostrich ---------- */
+  function makeRacer(isPlayer, trait, match, colorSet, skill){
+    return {
+      isPlayer, trait, match, colors: colorSet,
+      progress: 0,           // distance parcourue (unités piste)
+      lane: 0.5,             // position verticale 0..1 dans la bande
+      targetLane: 0.5,
+      speed: REST_SPEED,
+      stamina: 1,            // 0..1
+      sprintT: 0,            // temps restant de sprint
+      sprintCooldown: 0,
+      skill,                 // variance individuelle IA
+      stumbleT: 0,
+      legPhase: Math.random()*10,
+      finished:false,
+      finishTime:0
+    };
+  }
+
+  function setupRace(){
+    racers = [];
+    racers.push(makeRacer(true, chosenTrait, chosenMatch, COLORS.player, 1));
+    for(let i=0;i<4;i++){
+      const t = TRAITS[Math.floor(Math.random()*TRAITS.length)];
+      const m = MATCHES[Math.floor(Math.random()*MATCHES.length)];
+      const skill = 0.9 + Math.random()*0.22;
+      racers.push(makeRacer(false, t, m, COLORS.ai[i], skill));
+    }
+    elapsedTime = 0;
+    raceFinished = false;
+    bgScroll = 0;
+  }
+
+  /* ---------- Entrées ---------- */
+  const input = {
+    dragging:false, dragY:0,
+    tapTimes:[], comboMult:1,
+    lastPointerY:0, swipeStartY:0, swipeStartT:0
+  };
+
+  function pointerDown(y){
+    input.dragging = true;
+    input.dragY = y;
+    input.swipeStartY = y;
+    input.swipeStartT = performance.now();
+    registerTap();
+  }
+  function pointerMove(y){
+    if(!input.dragging) return;
+    const player = racers[0];
+    const rect = trackRectPx();
+    const rel = (y - rect.top) / rect.height;
+    player.targetLane = Math.min(1, Math.max(0, rel));
+  }
+  function pointerUp(y){
+    if(input.dragging){
+      const dt = performance.now() - input.swipeStartT;
+      const dy = y - input.swipeStartY;
+      if(dy > 60 && dt < 400){ trySprint(); }
+    }
+    input.dragging = false;
+  }
+  function registerTap(){
+    const now = performance.now();
+    input.tapTimes.push(now);
+    if(input.tapTimes.length > 6) input.tapTimes.shift();
+    // évalue régularité des 3 derniers intervalles
+    if(input.tapTimes.length >= 3){
+      const t = input.tapTimes;
+      const i1 = t[t.length-1]-t[t.length-2];
+      const i2 = t[t.length-2]-t[t.length-3];
+      const variance = Math.abs(i1-i2);
+      if(i1 > 140 && i1 < 550 && variance < 130){
+        input.comboMult = Math.min(1.55, input.comboMult + 0.07);
+      } else {
+        input.comboMult = Math.max(1, input.comboMult - 0.15);
+      }
+    }
+    const player = racers[0];
+    if(!raceFinished){
+      const boost = 16 * input.comboMult * traitAccelMult(player, "tap");
+      player.speed = Math.min(MAX_SPEED, player.speed + boost);
+      player.stamina = Math.min(1, player.stamina + 0.004);
+    }
+  }
+  function trySprint(){
+    const player = racers[0];
+    if(raceFinished) return;
+    if(player.stamina > 0.12 && player.sprintCooldown <= 0){
+      player.sprintT = 1.1;
+      player.sprintCooldown = 0.9;
+      shake = 6;
+    }
+  }
+
+  canvas.addEventListener("pointerdown", e=>{ e.preventDefault(); pointerDown(e.clientY - app.getBoundingClientRect().top); });
+  canvas.addEventListener("pointermove", e=>{ e.preventDefault(); pointerMove(e.clientY - app.getBoundingClientRect().top); });
+  window.addEventListener("pointerup", e=>{ pointerUp(e.clientY - app.getBoundingClientRect().top); });
+
+  function trackRectPx(){
+    return { top: H*0.32, height: H*0.4 };
+  }
+
+  /* ---------- Comportements liés aux traits ---------- */
+  function traitAccelMult(r, ctxName){
+    // "bon" matching = petit bonus, "mauvais" = comportement pénalisant caractéristique
+    if(r.match === "bon") return 1.12;
+    if(r.match === "neutre") return 1.0;
+    return 0.88; // mauvais, atténué (le vrai malus vient des comportements ci-dessous)
+  }
+
+  function applyTraitBehavior(r, dt){
+    const badMatch = r.match === "mauvais";
+    if(!badMatch) return 1; // multiplicateur de vitesse neutre
+
+    let mult = 1;
+    if(r.trait === "Ambitieuse"){
+      // démarrage lent
+      if(r.progress < TRACK_LENGTH*0.12) mult *= 0.55;
+    }
+    if(r.trait === "Craintive"){
+      // zigzag : oscillation de couloir qui coûte de la vitesse effective
+      r.targetLane = 0.5 + Math.sin(elapsedTime*3.2 + r.legPhase)*0.42;
+      mult *= 0.9;
+    }
+    if(r.trait === "Calme"){
+      // ralentissement anticipé après 55% de la course
+      if(r.progress > TRACK_LENGTH*0.55) mult *= 0.8;
+    }
+    if(r.trait === "Impulsive"){
+      // à-coups : petits trébuchements aléatoires
+      r.stumbleT -= dt;
+      if(r.stumbleT <= 0 && Math.random() < 0.01){
+        r.stumbleT = 0.4;
+      }
+      if(r.stumbleT > 0) mult *= 0.55;
+    }
+    return mult;
+  }
+
+  /* ---------- Boucle de mise à jour ---------- */
+  function updateRacer(r, dt, isPlayer){
+    if(r.finished) return;
+
+    // couloir : interpolation douce vers la cible
+    r.lane += (r.targetLane - r.lane) * Math.min(1, dt*6);
+
+    const behaviorMult = applyTraitBehavior(r, dt);
+
+    if(isPlayer){
+      // frein naturel vers vitesse de repos
+      r.speed += (REST_SPEED - r.speed) * Math.min(1, dt*0.6);
+      if(r.sprintT > 0){
+        r.sprintT -= dt;
+        r.speed += (MAX_SPEED - r.speed) * Math.min(1, dt*3.2);
+        r.stamina = Math.max(0, r.stamina - dt*0.34);
+      } else {
+        r.stamina = Math.min(1, r.stamina + dt*0.05);
+      }
+      r.sprintCooldown = Math.max(0, r.sprintCooldown - dt);
+      input.comboMult = Math.max(1, input.comboMult - dt*0.25);
+    } else {
+      // IA : vise une vitesse de croisière propre à son skill, avec petites variations
+      const cruise = BASE_SPEED * r.skill + Math.sin(elapsedTime*1.3 + r.legPhase)*8;
+      r.speed += (cruise - r.speed) * Math.min(1, dt*0.9);
+      if(r.match === "bon") r.speed *= 1.015;
+    }
+
+    r.progress += r.speed * behaviorMult * dt;
+    r.legPhase += dt * (4 + r.speed/60);
+
+    if(r.progress >= TRACK_LENGTH && !r.finished){
+      r.finished = true;
+      r.finishTime = elapsedTime;
+    }
+  }
+
+  function update(dt){
+    elapsedTime += dt;
+    bgScroll += racers[0].speed * dt;
+    shake = Math.max(0, shake - dt*18);
+
+    racers.forEach((r,i) => updateRacer(r, dt, i===0));
+
+    const player = racers[0];
+    document.getElementById("progressFill").style.width = Math.min(100, player.progress/TRACK_LENGTH*100) + "%";
+    document.getElementById("staminaFill").style.width = Math.max(0, player.stamina*100) + "%";
+
+    if(player.finished && !raceFinished){
+      raceFinished = true;
+      setTimeout(showResults, 650);
+    }
+  }
+
+  /* ---------- Rendu ---------- */
+  function drawBackground(){
+    ctx.fillStyle = "#FBE9C6";
+    ctx.fillRect(0,0,W,H*0.32);
+    ctx.fillStyle = "#E7C77E";
+    ctx.fillRect(0,H*0.32,W,H*0.44);
+    ctx.fillStyle = "#D9A94F";
+    ctx.fillRect(0,H*0.72,W,H*0.28);
+
+    // soleil
+    ctx.fillStyle = "#F7D77A";
+    ctx.beginPath(); ctx.arc(W*0.82, H*0.12, 26, 0, Math.PI*2); ctx.fill();
+
+    // silhouettes d'arbustes défilantes
+    ctx.fillStyle = "rgba(90,60,20,.35)";
+    const spacing = 130;
+    const offset = (bgScroll*0.5) % spacing;
+    for(let x = -offset; x < W+spacing; x += spacing){
+      ctx.beginPath();
+      ctx.ellipse(x, H*0.30, 22, 10, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // ligne d'arrivée (damier) si proche
+    const player = racers[0];
+    const remaining = TRACK_LENGTH - player.progress;
+    if(remaining < 900){
+      const fx = W*0.28 + remaining*0.15;
+      drawChecker(fx);
+    }
+  }
+  function drawChecker(x){
+    const size = 14;
+    for(let row=0; row<H*0.4/size; row++){
+      for(let col=0; col<2; col++){
+        ctx.fillStyle = (row+col)%2===0 ? "#221F2C" : "#FFFBF3";
+        ctx.fillRect(x+col*size, H*0.32+row*size, size, size);
+      }
+    }
+  }
+
+  function drawDust(x,y,intensity){
+    for(let i=0;i<intensity;i++){
+      ctx.fillStyle = "rgba(217,169,79,"+(0.18+Math.random()*0.15)+")";
+      ctx.beginPath();
+      ctx.arc(x - 14 - Math.random()*22, y + (Math.random()*10-5), 5+Math.random()*5, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawOstrich(r, screenX, isPlayer){
+    const rect = trackRectPx();
+    const y = rect.top + r.lane*rect.height;
+    const c = r.colors;
+    const legSwing = Math.sin(r.legPhase)*10;
+    const bob = Math.abs(Math.sin(r.legPhase))*4;
+
+    // poussière
+    drawDust(screenX, y+18, isPlayer ? (r.sprintT>0?5:2) : 2);
+
+    // traînée de sprint
+    if(isPlayer && r.sprintT>0){
+      ctx.fillStyle = "rgba(230,140,130,.35)";
+      ctx.beginPath();
+      ctx.ellipse(screenX-26, y-4-bob, 20, 8, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.save();
+    ctx.translate(screenX, y - bob);
+
+    // pattes
+    ctx.strokeStyle = c.body; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-4,14); ctx.lineTo(-4+legSwing,26); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4,14); ctx.lineTo(4-legSwing,26); ctx.stroke();
+
+    // corps
+    ctx.fillStyle = c.dark;
+    ctx.beginPath(); ctx.ellipse(-2,4,16,12,0,0,Math.PI*2); ctx.fill();
+    // poitrail clair
+    ctx.fillStyle = c.ruff;
+    ctx.beginPath(); ctx.ellipse(6,8,8,9,0,0,Math.PI*2); ctx.fill();
+    // cou
+    ctx.strokeStyle = c.body; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(4,0); ctx.lineTo(16,-20); ctx.stroke();
+    // tête
+    ctx.fillStyle = c.body;
+    ctx.beginPath(); ctx.arc(18,-24,8,0,Math.PI*2); ctx.fill();
+    // bec
+    ctx.fillStyle = "#F0A93A";
+    ctx.beginPath(); ctx.moveTo(24,-25); ctx.lineTo(34,-23); ctx.lineTo(24,-21); ctx.fill();
+    // oeil
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(21,-26,2.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#221F2C";
+    ctx.beginPath(); ctx.arc(21.8,-26,1.2,0,Math.PI*2); ctx.fill();
+
+    ctx.restore();
+
+    if(isPlayer){
+      ctx.fillStyle = "#221F2C";
+      ctx.font = "bold 10px Nunito, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("toi", screenX, y+38);
+    }
+  }
+
+  function render(){
+    ctx.save();
+    if(shake>0){ ctx.translate((Math.random()-.5)*shake, (Math.random()-.5)*shake); }
+
+    drawBackground();
+
+    const player = racers[0];
+    const playerScreenX = W*0.28;
+    const scale = 0.16; // px par unité d'écart de progression
+
+    // trier par écran x pour un rendu correct (arrière -> avant)
+    const drawList = racers.map((r,i)=>{
+      const dx = (r.progress - player.progress) * scale;
+      return {r, i, x: playerScreenX + dx};
+    }).sort((a,b)=>a.x-b.x);
+
+    drawList.forEach(d => drawOstrich(d.r, d.x, d.i===0));
+
+    ctx.restore();
+  }
+
+  /* ---------- Boucle principale ---------- */
+  function loop(ts){
+    if(!lastTs) lastTs = ts;
+    const dt = Math.min(0.05, (ts-lastTs)/1000);
+    lastTs = ts;
+    if(raceRunning){
+      update(dt);
+      render();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- Résultats ---------- */
+  function showResults(){
+    raceRunning = false;
+    document.getElementById("hud").classList.add("hidden");
+    const ranked = [...racers].sort((a,b) => b.progress - a.progress);
+    const list = document.getElementById("rankList");
+    list.innerHTML = "";
+    ranked.forEach((r, idx) => {
+      const row = document.createElement("div");
+      row.className = "rank-row" + (r.isPlayer ? " me" : "");
+      row.innerHTML = `<span class="rank-pos">${idx+1}</span><span>${r.isPlayer ? "Toi ("+r.trait+")" : r.trait}</span><span class="rank-gain">+${PAYOUTS[idx]} 🪙</span>`;
+      list.appendChild(row);
+    });
+    const playerRank = ranked.findIndex(r=>r.isPlayer)+1;
+    document.getElementById("resultSubtitle").textContent =
+      playerRank===1 ? "Tu remportes la course !" : `Tu termines ${playerRank}e sur 5`;
+    document.getElementById("result").classList.remove("hidden");
+  }
+
+  /* ---------- Démarrage ---------- */
+  document.getElementById("startBtn").onclick = () => {
+    document.getElementById("start").classList.add("hidden");
+    document.getElementById("hud").classList.remove("hidden");
+    resize();
+    setupRace();
+    raceRunning = true;
+    lastTs = 0;
+  };
+  document.getElementById("replayBtn").onclick = () => {
+    document.getElementById("result").classList.add("hidden");
+    document.getElementById("start").classList.remove("hidden");
+    renderTraitGrid();
+    renderMatchBadge();
+  };
+
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
