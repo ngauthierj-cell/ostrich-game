@@ -85,11 +85,16 @@
   .ecurie-chevron svg{width:18px;height:18px;}
 
   /* ---------- Écran poussinière ---------- */
+  .poussiniere-header-right{display:flex;align-items:center;gap:8px;}
   .poussiniere-hint{font-size:12px;color:var(--text-secondary);margin:-8px 4px 14px;}
   .poussiniere-empty{font-size:13px;color:var(--text-muted);text-align:center;padding:30px 10px;}
   .poussin-avatar{border-radius:50%;}
   .poussin-fill{background:var(--sage);}
   .btn-compact{padding:9px 14px;font-size:12px;flex-shrink:0;}
+  .poussin-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+  .btn-accelerate{color:var(--gold-dark);border-color:var(--gold-tint);}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .btn:disabled:active{transform:none;}
 
   /* ---------- Écran hub central ---------- */
   .hub-topbar{display:flex;align-items:center;justify-content:space-between;margin:2px 4px 18px;}
@@ -507,9 +512,12 @@
     </div>
     <div class="ecurie-header">
       <p class="ecurie-title">Poussinière</p>
-      <span class="ecurie-count" id="poussiniereCount"></span>
+      <div class="poussiniere-header-right">
+        <span class="resource-pill">🌾 <span id="grainesStock"></span></span>
+        <span class="ecurie-count" id="poussiniereCount"></span>
+      </div>
     </div>
-    <p class="poussiniere-hint">Trop jeunes pour l'écurie — soignez-les jusqu'au stade Jeune pour qu'ils vous rejoignent.</p>
+    <p class="poussiniere-hint">Trop jeunes pour l'écurie — nourrissez-les jusqu'au stade Jeune pour qu'ils vous rejoignent.</p>
     <div class="ecurie-list" id="poussiniereList"></div>
   </div>
 
@@ -564,11 +572,11 @@
   const SOINS_NEEDED = 5;
   const POUSSINS = [
     {
-      id:"nougat", name:"Nougat", coat:"Sable", trait:"Froussarde", soins:2,
+      id:"nougat", name:"Nougat", coat:"Sable", trait:"Froussarde", soins:2, cooldownUntil:0,
       pedigree:[ {name:"Griotte", trait:"Parano"}, {name:"Sable", trait:"Ambitieuse"} ]
     },
     {
-      id:"reglisse", name:"Réglisse", coat:"Noir", trait:"Têtue", soins:4,
+      id:"reglisse", name:"Réglisse", coat:"Noir", trait:"Têtue", soins:4, cooldownUntil:0,
       pedigree:[ {name:"Comète", trait:"Têtue"}, {name:"Silex", trait:"Parano"} ]
     }
   ];
@@ -625,11 +633,33 @@
     });
   }
 
-  // Poussinière : soins jusqu'à SOINS_NEEDED (pas de minuteur, cf. commentaire sur POUSSINS),
-  // puis transfert dans OSTRICHES au stade Jeune.
+  // Poussinière : soins jusqu'à SOINS_NEEDED (pas de minuteur, cf. §8.1 du rapport), puis
+  // transfert dans OSTRICHES au stade Jeune. Chaque soin (Nourrir) consomme une Graine &
+  // végétal — objet §10, devenu Commun — et déclenche un court repos (cooldown) par poussin,
+  // pour rythmer sans horloge réelle sur plusieurs heures. Les nombres ci-dessous (cooldown,
+  // stock de départ, coût de l'accélérateur) sont des valeurs de démo à recalibrer en playtest.
+  const SOIN_COOLDOWN_S = 5;       // repos après un Nourrir, par poussin
+  const ACCELERATOR_COST = 5;      // Pépites dépensées pour accélérer
+  const ACCELERATOR_GAIN = 2;      // soins gagnés d'un coup par l'accélérateur
+  let grainesStock = 2;            // stock de Graines & végétaux du joueur (mock)
+  let poussiniereTicker = null;
+
   function poussiniereCardHTML(p){
     const style = TRAIT_STYLE[p.trait];
     const ready = p.soins >= SOINS_NEEDED;
+    const cooldownLeft = Math.max(0, Math.ceil((p.cooldownUntil - Date.now())/1000));
+    const onCooldown = cooldownLeft > 0;
+    const actions = ready
+      ? `<button class="btn btn-primary btn-compact" data-action="graduate" data-id="${p.id}">Accueillir</button>`
+      : `
+        <div class="poussin-actions">
+          <button class="btn btn-outline btn-compact" data-action="feed" data-id="${p.id}" ${onCooldown ? "disabled" : ""}>
+            ${onCooldown ? `Repos… ${cooldownLeft}s` : "Nourrir"}
+          </button>
+          <button class="btn btn-outline btn-compact btn-accelerate" data-action="accelerate" data-id="${p.id}">
+            ⚡ Accélérer
+          </button>
+        </div>`;
     return `
       <div class="ecurie-avatar poussin-avatar" style="background:${style.tint};">
         <div style="filter:${style.filter};display:flex;">${ostrichAvatarSvg}</div>
@@ -645,13 +675,12 @@
           <span class="ecurie-capital-value">${p.soins}/${SOINS_NEEDED} soins</span>
         </div>
       </div>
-      <button class="btn ${ready ? "btn-primary" : "btn-outline"} btn-compact" data-id="${p.id}">
-        ${ready ? "Accueillir" : "Soigner"}
-      </button>`;
+      ${actions}`;
   }
 
   function renderPoussiniereList(){
     document.getElementById("poussiniereCount").textContent = `${POUSSINS.length} poussin${POUSSINS.length > 1 ? "s" : ""}`;
+    document.getElementById("grainesStock").textContent = grainesStock;
     const list = document.getElementById("poussiniereList");
     list.innerHTML = "";
     if(POUSSINS.length === 0){
@@ -662,21 +691,60 @@
       const card = document.createElement("div");
       card.className = "ecurie-card";
       card.innerHTML = poussiniereCardHTML(p);
-      card.querySelector("[data-id]").addEventListener("click", (e) => {
+      card.querySelectorAll("[data-action]").forEach(btn => btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if(p.soins >= SOINS_NEEDED) graduatePoussin(p.id);
-        else soinPoussin(p.id);
-      });
+        const action = e.currentTarget.dataset.action;
+        if(action === "graduate") graduatePoussin(p.id);
+        else if(action === "feed") feedPoussin(p.id);
+        else if(action === "accelerate") acceleratePoussin(p.id);
+      }));
       list.appendChild(card);
     });
+    ensurePoussiniereTicker();
   }
 
-  function soinPoussin(id){
+  // Tourne en continu (coût négligeable sur une poussinière de quelques poussins) pour faire
+  // décompter le repos affiché sur chaque carte, sans dépendre d'un minuteur par poussin.
+  function ensurePoussiniereTicker(){
+    if(poussiniereTicker) return;
+    poussiniereTicker = setInterval(() => {
+      renderPoussiniereList();
+      // s'arrête une fois qu'aucun poussin n'est en repos, après avoir peint l'état final
+      // (sinon le dernier "Repos... 1s" reste affiché indéfiniment une fois le repos écoulé)
+      if(!POUSSINS.some(p => p.cooldownUntil > Date.now())){
+        clearInterval(poussiniereTicker);
+        poussiniereTicker = null;
+      }
+    }, 1000);
+  }
+
+  function feedPoussin(id){
     const p = POUSSINS.find(x => x.id === id);
-    if(!p || p.soins >= SOINS_NEEDED) return;
+    if(!p || p.soins >= SOINS_NEEDED || p.cooldownUntil > Date.now()) return;
+    if(grainesStock <= 0){
+      showToast("Plus de Graines & végétaux — achète-en au Marché");
+      return;
+    }
+    grainesStock--;
     p.soins++;
+    p.cooldownUntil = Date.now() + SOIN_COOLDOWN_S*1000;
     const readyNote = p.soins >= SOINS_NEEDED ? " — prêt à rejoindre l'écurie !" : "";
     showToast(`${p.name} +1 soin (${p.soins}/${SOINS_NEEDED})${readyNote}`);
+    renderPoussiniereList();
+  }
+
+  function acceleratePoussin(id){
+    const p = POUSSINS.find(x => x.id === id);
+    if(!p || p.soins >= SOINS_NEEDED) return;
+    if(HUB_RESOURCES.pepites < ACCELERATOR_COST){
+      showToast(`Pas assez de Pépites (${ACCELERATOR_COST} nécessaires)`);
+      return;
+    }
+    HUB_RESOURCES.pepites -= ACCELERATOR_COST;
+    p.soins = Math.min(SOINS_NEEDED, p.soins + ACCELERATOR_GAIN);
+    renderHub();
+    const readyNote = p.soins >= SOINS_NEEDED ? " — prêt à rejoindre l'écurie !" : "";
+    showToast(`${p.name} +${ACCELERATOR_GAIN} soins (${p.soins}/${SOINS_NEEDED})${readyNote}`);
     renderPoussiniereList();
   }
 
