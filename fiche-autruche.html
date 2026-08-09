@@ -186,6 +186,16 @@
   .capital-value{font-size:12px;font-weight:800;color:var(--ink);}
   .capital-track{height:9px;background:var(--track);border-radius:var(--radius-pill);overflow:hidden;}
   .capital-fill{height:100%;background:var(--gold);border-radius:var(--radius-pill);}
+  .forme-fill.forme-high{background:var(--sage);}
+  .forme-fill.forme-mid{background:var(--gold);}
+  .forme-fill.forme-low{background:var(--pink-dark);}
+  .forme-warning{font-size:11px;font-weight:700;color:var(--pink-dark);margin:8px 0 0;}
+  .forme-warning.hidden{display:none;}
+  .forme-demo-btn{
+    display:block;margin:8px 0 0;padding:0;border:none;background:none;
+    font-family:'Nunito',sans-serif;font-size:11px;color:var(--text-muted);
+    text-decoration:underline;cursor:pointer;
+  }
 
   /* pedigree accordion */
   .pedigree-btn{
@@ -378,7 +388,10 @@
     </div>
     <div class="ecurie-header">
       <p class="ecurie-title">Mon écurie</p>
-      <span class="ecurie-count" id="ecurieCount"></span>
+      <div class="poussiniere-header-right">
+        <span class="resource-pill">🍎 <span id="fruitsStock"></span></span>
+        <span class="ecurie-count" id="ecurieCount"></span>
+      </div>
     </div>
     <div class="ecurie-list" id="ecurieList"></div>
   </div>
@@ -469,6 +482,19 @@
         <div class="capital-track"><div class="capital-fill" id="capitalFill"></div></div>
       </div>
 
+      <div class="section">
+        <div class="capital-top">
+          <span class="capital-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+            Forme du jour
+          </span>
+          <span class="capital-value" id="formeValue"></span>
+        </div>
+        <div class="capital-track"><div class="capital-fill forme-fill" id="formeFill"></div></div>
+        <p class="forme-warning hidden" id="formeWarning">⚠ Performance réduite tant qu'elle n'est pas reposée</p>
+        <button class="forme-demo-btn" id="btnSimulerCourse">🏁 Simuler une course (démo — fatigue -30)</button>
+      </div>
+
       <button class="pedigree-btn" id="pedigreeBtn" aria-expanded="false" aria-controls="pedigreePanel">
         <span class="left">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3v6a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V3M12 13v8M6 3a2 2 0 1 0 0 .01M18 3a2 2 0 1 0 0 .01"/></svg>
@@ -545,22 +571,22 @@
   // d'affichage : stats verrouillées, pedigree inconnu, action Reproduire indisponible...
   const OSTRICHES = [
     {
-      id:"bolt", name:"Bolt", stage:"Adulte", coat:"Pic", trait:"Ambitieuse", capital:62,
+      id:"bolt", name:"Bolt", stage:"Adulte", coat:"Pic", trait:"Ambitieuse", capital:62, forme:85,
       stats:{ speed:78, endurance:55, agility:null },
       pedigree:[ {name:"Comète", trait:"Têtue"}, {name:"Silex", trait:"Parano"} ]
     },
     {
-      id:"comete", name:"Comète", stage:"Vétérane", coat:"Doré", trait:"Têtue", capital:112,
+      id:"comete", name:"Comète", stage:"Vétérane", coat:"Doré", trait:"Têtue", capital:112, forme:35,
       stats:{ speed:70, endurance:38, agility:61 },
       pedigree:null
     },
     {
-      id:"griotte", name:"Griotte", stage:"Jeune", coat:"Roux", trait:"Parano", capital:9,
+      id:"griotte", name:"Griotte", stage:"Jeune", coat:"Roux", trait:"Parano", capital:9, forme:100,
       stats:{ speed:64, endurance:null, agility:null },
       pedigree:[ {name:"Bolt", trait:"Ambitieuse"}, {name:"Comète", trait:"Têtue"} ]
     },
     {
-      id:"silex", name:"Silex", stage:"Adulte", coat:"Gris", trait:"Parano", capital:45,
+      id:"silex", name:"Silex", stage:"Adulte", coat:"Gris", trait:"Parano", capital:45, forme:60,
       stats:{ speed:59, endurance:66, agility:52 },
       pedigree:null
     }
@@ -582,6 +608,16 @@
   ];
 
   const HUB_RESOURCES = { picaillons:340, pepites:12 }; // monnaies mock (rapport §9.1)
+
+  // Entretien : restaure la Forme du jour (jauge courte, distincte du capital course de
+  // carrière §8.2) en consommant un Fruit — objet §10, "récupération instantanée de
+  // stamina", devenu Rare. Contrairement au capital, la Forme n'est pas affectée par une
+  // vraie course ici : index.html (la course jouable) est un fichier séparé sans état
+  // partagé avec l'écurie, donc "Simuler une course" sert à exercer la mécanique dans ce
+  // prototype. Seuil et perte par course sont des valeurs de démo à recalibrer.
+  const FORME_LOW_THRESHOLD = 50;
+  const FORME_RACE_COST = 30;
+  let fruitsStock = 2; // stock de Fruits du joueur (mock)
 
   const screenHub = document.getElementById("screenHub");
   const screenEcurie = document.getElementById("screenEcurie");
@@ -622,6 +658,7 @@
 
   function renderEcurieList(){
     document.getElementById("ecurieCount").textContent = `${OSTRICHES.length} autruche${OSTRICHES.length > 1 ? "s" : ""}`;
+    document.getElementById("fruitsStock").textContent = fruitsStock;
     const list = document.getElementById("ecurieList");
     list.innerHTML = "";
     OSTRICHES.forEach(o => {
@@ -754,7 +791,7 @@
     const p = POUSSINS[idx];
     POUSSINS.splice(idx, 1);
     OSTRICHES.push({
-      id:p.id, name:p.name, stage:"Jeune", coat:p.coat, trait:p.trait, capital:0,
+      id:p.id, name:p.name, stage:"Jeune", coat:p.coat, trait:p.trait, capital:0, forme:100,
       stats:{ speed:null, endurance:null, agility:null },
       pedigree:p.pedigree
     });
@@ -791,6 +828,37 @@
     }
   }
 
+  function renderFormeUI(o){
+    document.getElementById("formeValue").textContent = `${o.forme}%`;
+    const fill = document.getElementById("formeFill");
+    fill.style.width = o.forme + "%";
+    fill.classList.remove("forme-high", "forme-mid", "forme-low");
+    fill.classList.add(o.forme >= 70 ? "forme-high" : o.forme >= FORME_LOW_THRESHOLD ? "forme-mid" : "forme-low");
+    document.getElementById("formeWarning").classList.toggle("hidden", o.forme >= FORME_LOW_THRESHOLD);
+  }
+
+  function entretienAction(o){
+    if(o.forme >= 100){
+      showToast(`${o.name} est déjà en pleine forme`);
+      return;
+    }
+    if(fruitsStock <= 0){
+      showToast("Plus de Fruits — achète-en au Marché");
+      return;
+    }
+    fruitsStock--;
+    document.getElementById("fruitsStock").textContent = fruitsStock;
+    o.forme = 100;
+    renderFormeUI(o);
+    showToast(`Entretien effectué sur ${o.name} — forme du jour restaurée !`);
+  }
+
+  function simulerCourseAction(o){
+    o.forme = Math.max(0, o.forme - FORME_RACE_COST);
+    renderFormeUI(o);
+    showToast(`${o.name} vient de courir (démo) — forme du jour : ${o.forme}%`);
+  }
+
   function openFiche(id){
     const o = OSTRICHES.find(x => x.id === id);
     if(!o) return;
@@ -813,6 +881,7 @@
 
     document.getElementById("capitalValue").textContent = `${o.capital} / ${STAGE_CAPITAL}`;
     document.getElementById("capitalFill").style.width = (o.capital/STAGE_CAPITAL*100) + "%";
+    renderFormeUI(o);
 
     const tree = document.getElementById("pedigreeTree");
     if(o.pedigree){
@@ -826,7 +895,8 @@
     document.getElementById("pedigreePanel").classList.remove("open");
     document.getElementById("pedigreeBtn").setAttribute("aria-expanded", "false");
 
-    document.getElementById("btnEntretien").onclick = () => showToast(`Entretien effectué sur ${o.name} — endurance restaurée !`);
+    document.getElementById("btnEntretien").onclick = () => entretienAction(o);
+    document.getElementById("btnSimulerCourse").onclick = () => simulerCourseAction(o);
     document.getElementById("btnReproduire").onclick = () => showToast(`Choisis un second parent pour reproduire ${o.name}`);
     document.getElementById("btnVendre").onclick = () => showToast(`${o.name} est mise en vente sur le marché`);
 
