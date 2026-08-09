@@ -113,7 +113,7 @@
     <div class="trait-grid" id="traitGrid"></div>
     <div class="match-badge" id="matchBadge"></div>
     <button class="big-btn" id="startBtn">C'est parti !</button>
-    <p class="hint">Tape à un rythme régulier pour accélérer · Glisse le doigt pour te déplacer · Swipe vers le bas pour sprinter</p>
+    <p class="hint">Tape à un rythme régulier pour accélérer · Glisse le doigt pour te déplacer et éviter trous, cailloux et broussailles · Swipe vers le bas pour sprinter</p>
   </div>
 
   <!-- HUD course -->
@@ -154,6 +154,14 @@
   const SPRINT_MATCH = { "Têtue":"bon", "Ambitieuse":"mauvais", "Parano":"mauvais", "Froussarde":"neutre" };
   const PAYOUTS = [50,35,20,10,10]; // en Picaillons, selon classement (rapport §9.1, §7.2 pour le bonus/malus de matching)
 
+  // Obstacles fixes (rapport §5.2) : trou (le plus punitif), caillou (moyen), broussaille (léger, plus large).
+  const OBSTACLE_TYPES = {
+    trou:        { hitRadius:0.10, stumbleDur:0.55, speedMult:0.35 },
+    caillou:     { hitRadius:0.09, stumbleDur:0.32, speedMult:0.55 },
+    broussaille: { hitRadius:0.13, stumbleDur:0.22, speedMult:0.75 }
+  };
+  const OBSTACLE_KEYS = Object.keys(OBSTACLE_TYPES);
+
   const COLORS = {
     player:  {body:"#E68C82", ruff:"#F1E6D4", dark:"#221F2C"},
     ai:[
@@ -168,6 +176,7 @@
   let chosenTrait = TRAITS[0];
   let chosenMatch = SPRINT_MATCH[chosenTrait];
   let racers = [];
+  let obstacles = [];
   let raceRunning = false;
   let raceFinished = false;
   let elapsedTime = 0;
@@ -224,8 +233,26 @@
       skill,                 // variance individuelle IA
       legPhase: Math.random()*10,
       finished:false,
-      finishTime:0
+      finishTime:0,
+      stumbleT:0, stumbleMult:1,   // pénalité en cours suite à un obstacle heurté
+      hitObstacles: new Set(),     // obstacles déjà traités (heurtés ou esquivés)
+      dodgeDecisions: new Map()    // IA seulement : décision d'esquive par obstacle
     };
+  }
+
+  function generateObstacles(){
+    // Obstacles fixes rapprochés (rapport §5.2), répartis entre 12% et 90% de la piste.
+    const count = 8;
+    const start = TRACK_LENGTH*0.12, end = TRACK_LENGTH*0.90;
+    const span = (end - start) / count;
+    const list = [];
+    for(let i=0;i<count;i++){
+      const type = OBSTACLE_KEYS[Math.floor(Math.random()*OBSTACLE_KEYS.length)];
+      const progress = start + i*span + Math.random()*span*0.6;
+      const lane = 0.18 + Math.random()*0.64;
+      list.push(Object.assign({ type, progress, lane }, OBSTACLE_TYPES[type]));
+    }
+    return list.sort((a,b)=>a.progress-b.progress);
   }
 
   function setupRace(){
@@ -236,6 +263,7 @@
       const skill = 0.9 + Math.random()*0.22;
       racers.push(makeRacer(false, t, SPRINT_MATCH[t], COLORS.ai[i], skill));
     }
+    obstacles = generateObstacles();
     elapsedTime = 0;
     raceFinished = false;
     bgScroll = 0;
@@ -338,21 +366,68 @@
       // zigzague seule (plus dur à contrôler) — oscillation de couloir
       r.targetLane = 0.5 + Math.sin(elapsedTime*3.2 + r.legPhase)*0.42;
     }
+    if(r.trait === "Froussarde"){
+      // ralentit près des obstacles (n'importe lequel, pas juste dans son couloir)
+      const near = obstacles.find(o => !r.hitObstacles.has(o) && o.progress - r.progress > 0 && o.progress - r.progress < 380);
+      if(near) mult *= 0.88;
+    }
     // Têtue : réagit plus lentement aux directions — voir laneLerpRate dans updateRacer.
-    // Froussarde : ralentit près des obstacles / sprint sur événement surprise —
-    // nécessite le système d'obstacles, pas encore implémenté dans ce prototype Sprint ligne droite.
     return mult;
+  }
+
+  /* ---------- Obstacles : collision et esquive ---------- */
+  // Ajuste le rayon de collision et la pénalité selon le trait (rapport §7.1/§7 : Têtue
+  // "ignore certains malus adverses", Parano "esquive mieux les obstacles aléatoires").
+  function obstacleEffect(o, r){
+    let hitRadius = o.hitRadius, stumbleDur = o.stumbleDur, speedMult = o.speedMult;
+    if(r.trait === "Parano") hitRadius *= 0.55;
+    if(r.trait === "Têtue"){ stumbleDur *= 0.5; speedMult = 1 - (1-speedMult)*0.5; }
+    return { hitRadius, stumbleDur, speedMult };
+  }
+  function nextObstacleAhead(r, lookahead){
+    return obstacles.find(o => !r.hitObstacles.has(o) && o.progress - r.progress > 0 && o.progress - r.progress < lookahead);
+  }
+  function checkObstacleCollision(r){
+    for(const o of obstacles){
+      if(r.hitObstacles.has(o) || r.progress < o.progress) continue;
+      r.hitObstacles.add(o);
+      const eff = obstacleEffect(o, r);
+      if(Math.abs(r.lane - o.lane) < eff.hitRadius){
+        r.stumbleT = Math.max(r.stumbleT, eff.stumbleDur);
+        r.stumbleMult = eff.speedMult;
+      }
+    }
+  }
+  function aiObstacleReaction(r){
+    const upcoming = nextObstacleAhead(r, 650);
+    if(!upcoming) return;
+    if(!r.dodgeDecisions.has(upcoming)){
+      const dodgeChance = 0.55 + r.skill*0.3 + (r.trait === "Parano" ? 0.25 : 0);
+      r.dodgeDecisions.set(upcoming, Math.random() < dodgeChance);
+    }
+    if(!r.dodgeDecisions.get(upcoming)) return;
+    const eff = obstacleEffect(upcoming, r);
+    if(Math.abs(r.lane - upcoming.lane) < eff.hitRadius + 0.10){
+      r.targetLane = upcoming.lane < 0.5 ? Math.min(1, upcoming.lane + 0.4) : Math.max(0, upcoming.lane - 0.4);
+    }
   }
 
   /* ---------- Boucle de mise à jour ---------- */
   function updateRacer(r, dt, isPlayer){
     if(r.finished) return;
 
+    if(!isPlayer) aiObstacleReaction(r);
+
     // couloir : interpolation douce vers la cible (Têtue réagit plus lentement aux directions)
     const laneLerpRate = r.trait === "Têtue" ? 3 : 6;
     r.lane += (r.targetLane - r.lane) * Math.min(1, dt*laneLerpRate);
 
-    const behaviorMult = applyTraitBehavior(r, dt);
+    let behaviorMult = applyTraitBehavior(r, dt);
+    checkObstacleCollision(r);
+    if(r.stumbleT > 0){
+      r.stumbleT -= dt;
+      behaviorMult *= r.stumbleMult;
+    }
     const timing = matchTiming(r.match);
 
     if(isPlayer){
@@ -449,6 +524,34 @@
     }
   }
 
+  function drawObstacle(o, screenX){
+    const rect = trackRectPx();
+    const y = rect.top + o.lane*rect.height;
+    if(o.type === "trou"){
+      ctx.fillStyle = "rgba(60,38,16,.55)";
+      ctx.beginPath(); ctx.ellipse(screenX, y+9, 17, 8, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "rgba(30,18,8,.75)";
+      ctx.beginPath(); ctx.ellipse(screenX, y+9, 11, 5, 0, 0, Math.PI*2); ctx.fill();
+    } else if(o.type === "caillou"){
+      ctx.fillStyle = "#8B8378";
+      ctx.beginPath();
+      ctx.moveTo(screenX-9,y+7); ctx.lineTo(screenX-3,y-6); ctx.lineTo(screenX+7,y-8);
+      ctx.lineTo(screenX+11,y+2); ctx.lineTo(screenX+2,y+9); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#B5AA98";
+      ctx.beginPath(); ctx.ellipse(screenX-1,y-3,3.5,2.5,0.4,0,Math.PI*2); ctx.fill();
+    } else { // broussaille
+      ctx.fillStyle = "#5B7247";
+      for(let i=0;i<5;i++){
+        const ang = (i/5)*Math.PI*2;
+        ctx.beginPath();
+        ctx.ellipse(screenX+Math.cos(ang)*7, y+Math.sin(ang)*4, 6, 4, ang, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#3E5230";
+      ctx.beginPath(); ctx.ellipse(screenX, y+1, 5, 3.5, 0, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
   function drawOstrich(r, screenX, isPlayer){
     const rect = trackRectPx();
     const y = rect.top + r.lane*rect.height;
@@ -516,13 +619,18 @@
     const playerScreenX = W*0.28;
     const scale = 0.16; // px par unité d'écart de progression
 
-    // trier par écran x pour un rendu correct (arrière -> avant)
-    const drawList = racers.map((r,i)=>{
-      const dx = (r.progress - player.progress) * scale;
-      return {r, i, x: playerScreenX + dx};
-    }).sort((a,b)=>a.x-b.x);
+    // trier par écran x pour un rendu correct (arrière -> avant), autruches + obstacles mélangés
+    const drawList = racers.map((r,i)=>({
+      kind:"racer", r, i, x: playerScreenX + (r.progress - player.progress) * scale
+    })).concat(obstacles.map(o=>({
+      kind:"obstacle", o, x: playerScreenX + (o.progress - player.progress) * scale
+    }))).sort((a,b)=>a.x-b.x);
 
-    drawList.forEach(d => drawOstrich(d.r, d.x, d.i===0));
+    drawList.forEach(d => {
+      if(d.x < -40 || d.x > W+40) return; // hors écran
+      if(d.kind === "racer") drawOstrich(d.r, d.x, d.i===0);
+      else drawObstacle(d.o, d.x);
+    });
 
     ctx.restore();
   }
