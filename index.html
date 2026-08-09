@@ -426,8 +426,12 @@
       if(r.progress > TRACK_LENGTH*0.80) mult *= 1.25;
     }
     if(r.trait === "Parano"){
-      // zigzague seule (plus dur à contrôler) — oscillation de couloir
-      r.targetLane = 0.5 + Math.sin(elapsedTime*3.2 + r.legPhase)*0.42;
+      // zigzague seule (plus dur à contrôler) — oscillation de couloir, dont le centre
+      // s'écarte de tout coureur qui s'approche trop, même sans danger réel (fausse alerte)
+      let center = 0.5;
+      const near = racers.find(o => o !== r && !o.finished && Math.abs(o.progress - r.progress) < 60 && Math.abs(o.lane - r.lane) < 0.25);
+      if(near) center = near.lane < r.lane ? Math.min(0.85, r.lane + 0.25) : Math.max(0.15, r.lane - 0.25);
+      r.targetLane = Math.max(0, Math.min(1, center + Math.sin(elapsedTime*3.2 + r.legPhase)*0.42));
     }
     if(r.trait === "Froussarde"){
       // ralentit près des obstacles (n'importe lequel, pas juste dans son couloir)
@@ -444,7 +448,7 @@
   // "ignore certains malus adverses", Parano "esquive mieux les obstacles aléatoires").
   function obstacleEffect(o, r){
     let hitRadius = o.hitRadius, stumbleDur = o.stumbleDur, speedMult = o.speedMult;
-    if(r.trait === "Parano") hitRadius *= 0.55;
+    if(r.trait === "Parano") hitRadius *= 0.4; // esquive renforcée : rayon de collision très réduit
     if(r.trait === "Têtue"){ stumbleDur *= 0.8; speedMult = 1 - (1-speedMult)*0.2; } // résistance allégée : les obstacles doivent encore la ralentir
     return { hitRadius, stumbleDur, speedMult };
   }
@@ -468,7 +472,7 @@
     const upcoming = nextObstacleAhead(r, 650);
     if(!upcoming) return;
     if(!r.dodgeDecisions.has(upcoming)){
-      const dodgeChance = 0.55 + r.skill*0.3 + (r.trait === "Parano" ? 0.25 : 0);
+      const dodgeChance = 0.55 + r.skill*0.3 + (r.trait === "Parano" ? 0.35 : 0);
       r.dodgeDecisions.set(upcoming, Math.random() < dodgeChance);
     }
     if(!r.dodgeDecisions.get(upcoming)) return;
@@ -510,7 +514,7 @@
   const EVENT_REACT_DELAY = HAWK_SWEEP_DUR/2;  // résolution au point bas du piqué, milieu du survol
   function triggerSurpriseEvent(r, dangerLane){
     if(r.finished) return;
-    const radius = r.trait === "Parano" ? 0.14 : 0.22; // Parano esquive mieux
+    const radius = r.trait === "Parano" ? 0.10 : 0.22; // Parano esquive encore mieux
     if(Math.abs(r.lane - dangerLane) >= radius) return; // hors de la zone : le rapace l'a ratée
 
     if(r.trait === "Têtue"){
@@ -535,7 +539,7 @@
 
   function aiEventReaction(r, dangerLane){
     if(Math.abs(r.lane - dangerLane) > 0.35) return; // déjà hors de portée, inutile de réagir
-    const dodgeChance = 0.5 + r.skill*0.3 + (r.trait === "Parano" ? 0.25 : 0);
+    const dodgeChance = 0.5 + r.skill*0.3 + (r.trait === "Parano" ? 0.35 : 0);
     if(Math.random() < dodgeChance){
       r.targetLane = dangerLane < 0.5 ? Math.min(1, dangerLane + 0.4) : Math.max(0, dangerLane - 0.4);
     }
