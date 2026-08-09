@@ -269,7 +269,9 @@
       finished:false,
       finishTime:0,
       stumbleT:0, stumbleMult:1,   // pénalité en cours suite à un obstacle heurté ou un événement
-      hitFlashT:0,                 // retour visuel bref au moment de l'impact
+      hitFlashT:0,                 // retour visuel bref (pattes) au moment d'un obstacle heurté
+      bumpFlashT:0,                // retour visuel bref (corps) au moment d'une bousculade avec une Ambitieuse
+      bumpCooldown:0,              // anti-répétition pour la collision avec une Ambitieuse
       hitObstacles: new Set(),     // obstacles déjà traités (heurtés ou esquivés)
       dodgeDecisions: new Map()    // IA seulement : décision d'esquive par obstacle
     };
@@ -473,6 +475,30 @@
     }
   }
 
+  /* ---------- Bousculade : Ambitieuse agit comme un obstacle faible pour les autres ---------- */
+  // Contrairement aux obstacles fixes, elle se déplace : vérifiée chaque frame (proximité de
+  // couloir + de progression), avec le même gabarit qu'une broussaille (le plus léger). Le
+  // choc se voit sur le corps (voir bumpFlashT dans drawOstrich), jamais sur les pattes.
+  function checkAmbitieuseBump(){
+    const ambitieuses = racers.filter(r => r.trait === "Ambitieuse" && !r.finished);
+    if(!ambitieuses.length) return;
+    racers.forEach(r => {
+      if(r.finished || r.bumpCooldown > 0 || r.trait === "Ambitieuse") return;
+      for(const amb of ambitieuses){
+        if(Math.abs(r.progress - amb.progress) > 50) continue;
+        const eff = obstacleEffect(OBSTACLE_TYPES.broussaille, r);
+        if(Math.abs(r.lane - amb.lane) < eff.hitRadius){
+          r.stumbleT = Math.max(r.stumbleT, eff.stumbleDur);
+          r.stumbleMult = eff.speedMult;
+          r.bumpFlashT = 0.35;
+          r.bumpCooldown = 1.2;
+          if(r.isPlayer) shake = Math.max(shake, 6);
+          break;
+        }
+      }
+    });
+  }
+
   /* ---------- Événements dynamiques : "un rapace passe" (rapport §5.2/§7) ---------- */
   // Contrairement aux obstacles fixes, l'événement se déclenche pour tous au même instant
   // (elapsedTime), mais frappe un couloir précis, tiré au sort — comme un obstacle mobile,
@@ -556,6 +582,8 @@
       behaviorMult *= r.stumbleMult;
     }
     if(r.hitFlashT > 0) r.hitFlashT -= dt;
+    if(r.bumpFlashT > 0) r.bumpFlashT -= dt;
+    if(r.bumpCooldown > 0) r.bumpCooldown -= dt;
     const timing = matchTiming(r.match);
 
     if(isPlayer){
@@ -593,6 +621,7 @@
     hawkT = Math.max(0, hawkT - dt);
     dangerWarnT = Math.max(0, dangerWarnT - dt);
     checkEvents();
+    checkAmbitieuseBump();
 
     racers.forEach((r,i) => updateRacer(r, dt, i===0));
 
@@ -762,9 +791,10 @@
     const rect = trackRectPx();
     const y = rect.top + r.lane*rect.height;
     const c = r.colors;
-    // en cas de choc, seules les pattes trébuchent (mouvement court et rapide) — le
-    // reste du corps et la tête gardent leur foulée normale
-    const legSwing = r.stumbleT > 0 ? Math.sin(elapsedTime*46 + r.legPhase)*4 : Math.sin(r.legPhase)*10;
+    // choc avec un obstacle au sol : seules les pattes trébuchent (mouvement court et rapide) —
+    // le reste du corps et la tête gardent leur foulée normale. Une bousculade (Ambitieuse,
+    // voir bumpFlashT plus bas) ne touche jamais les pattes : c'est le corps qui l'encaisse.
+    const legSwing = r.hitFlashT > 0 ? Math.sin(elapsedTime*46 + r.legPhase)*4 : Math.sin(r.legPhase)*10;
     const bob = Math.abs(Math.sin(r.legPhase))*4;
 
     // poussière : intensité liée à la vitesse réelle, pas juste au sprint
@@ -808,6 +838,27 @@
         ctx.font = "bold 12px Fredoka, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("Aïe !", screenX, legY+22);
+      }
+    }
+
+    // flash de bousculade (Ambitieuse) : centré sur le corps, jamais les pattes ni la tête
+    if(r.bumpFlashT > 0){
+      const a = r.bumpFlashT / 0.35;
+      const bodyY = y - bob + 4;
+      ctx.strokeStyle = "rgba(255,255,255,"+(0.4+a*0.5)+")";
+      ctx.lineWidth = 2;
+      for(let i=0;i<5;i++){
+        const ang = (i/5)*Math.PI*2;
+        ctx.beginPath();
+        ctx.moveTo(screenX-2+Math.cos(ang)*13, bodyY+Math.sin(ang)*10);
+        ctx.lineTo(screenX-2+Math.cos(ang)*(13+7*a), bodyY+Math.sin(ang)*(10+7*a));
+        ctx.stroke();
+      }
+      if(isPlayer){
+        ctx.fillStyle = "rgba(184,90,80,"+(0.55+a*0.45)+")";
+        ctx.font = "bold 12px Fredoka, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Boum !", screenX, bodyY-16);
       }
     }
 
