@@ -85,7 +85,7 @@
   .hud-track{flex:1;height:8px;background:rgba(34,31,44,.18);border-radius:999px;overflow:hidden;}
   .hud-fill{height:100%;border-radius:999px;background:var(--gold);}
   .stamina-fill{height:100%;border-radius:999px;background:var(--pink);}
-  .hud-label{font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);width:52px;}
+  .hud-label{font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);width:62px;flex-shrink:0;}
 
   .event-banner{
     position:absolute;top:13%;left:50%;transform:translateX(-50%);
@@ -144,7 +144,7 @@
       <div class="hud-track"><div class="hud-fill" id="progressFill" style="width:0%"></div></div>
     </div>
     <div class="hud-row">
-      <span class="hud-label">Capital</span>
+      <span class="hud-label">Endurance</span>
       <div class="hud-track"><div class="stamina-fill" id="staminaFill" style="width:100%"></div></div>
     </div>
   </div>
@@ -179,10 +179,12 @@
   const PAYOUTS = [50,35,20,10,10]; // en Picaillons, selon classement (rapport §9.1, §7.2 pour le bonus/malus de matching)
 
   // Obstacles fixes (rapport §5.2) : trou (le plus punitif), caillou (moyen), broussaille (léger, plus large).
+  // Rayons de collision volontairement larges : il faut réagir et changer de couloir,
+  // pas juste passer à proximité pour les éviter.
   const OBSTACLE_TYPES = {
-    trou:        { hitRadius:0.10, stumbleDur:0.55, speedMult:0.35 },
-    caillou:     { hitRadius:0.09, stumbleDur:0.32, speedMult:0.55 },
-    broussaille: { hitRadius:0.13, stumbleDur:0.22, speedMult:0.75 }
+    trou:        { hitRadius:0.16, stumbleDur:0.55, speedMult:0.35 },
+    caillou:     { hitRadius:0.14, stumbleDur:0.32, speedMult:0.55 },
+    broussaille: { hitRadius:0.20, stumbleDur:0.22, speedMult:0.75 }
   };
   const OBSTACLE_KEYS = Object.keys(OBSTACLE_TYPES);
 
@@ -278,7 +280,7 @@
 
   function generateObstacles(){
     // Obstacles fixes rapprochés (rapport §5.2), répartis entre 12% et 90% de la piste.
-    const count = 8;
+    const count = 11;
     const start = TRACK_LENGTH*0.12, end = TRACK_LENGTH*0.90;
     const span = (end - start) / count;
     const list = [];
