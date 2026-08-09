@@ -375,6 +375,12 @@
     const player = racers[0];
     if(raceFinished) return;
     if(player.stamina > 0.12 && player.sprintCooldown <= 0){
+      if(player.trait === "Têtue" && Math.random() < 0.3){
+        // têtue : refuse parfois de sprinter, courte pause avant de pouvoir réessayer
+        player.sprintCooldown = 0.3;
+        showEventBanner("🦴 Elle refuse de sprinter !");
+        return;
+      }
       player.sprintT = 1.1;
       player.sprintCooldown = 0.9 * matchTiming(player.match).sprintCooldownMult;
       shake = 12;
