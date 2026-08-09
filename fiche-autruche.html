@@ -84,6 +84,13 @@
   .ecurie-chevron{color:var(--text-muted);flex-shrink:0;}
   .ecurie-chevron svg{width:18px;height:18px;}
 
+  /* ---------- Écran poussinière ---------- */
+  .poussiniere-hint{font-size:12px;color:var(--text-secondary);margin:-8px 4px 14px;}
+  .poussiniere-empty{font-size:13px;color:var(--text-muted);text-align:center;padding:30px 10px;}
+  .poussin-avatar{border-radius:50%;}
+  .poussin-fill{background:var(--sage);}
+  .btn-compact{padding:9px 14px;font-size:12px;flex-shrink:0;}
+
   /* ---------- Écran hub central ---------- */
   .hub-topbar{display:flex;align-items:center;justify-content:space-between;margin:2px 4px 18px;}
   .hub-title{font-family:'Fredoka',sans-serif;font-weight:700;font-size:24px;color:var(--ink);margin:0;}
@@ -267,21 +274,21 @@
     </div>
 
     <div class="hub-map-wrap">
-      <svg class="hub-map-svg" viewBox="0 0 340 420" xmlns="http://www.w3.org/2000/svg">
+      <svg class="hub-map-svg" viewBox="0 0 340 470" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <clipPath id="domeClip"><path d="M105 100 A65 55 0 0 1 235 100 Z"/></clipPath>
-          <clipPath id="awningClip"><path d="M202 230 L298 230 L288 198 L212 198 Z"/></clipPath>
+          <clipPath id="awningClip"><path d="M202 288 L298 288 L288 256 L212 256 Z"/></clipPath>
         </defs>
 
         <!-- terrain -->
-        <rect x="0" y="0" width="340" height="420" rx="22" fill="var(--sage-tint)"/>
+        <rect x="0" y="0" width="340" height="470" rx="22" fill="var(--sage-tint)"/>
         <ellipse cx="55" cy="55" rx="30" ry="14" fill="#EFF7EE" opacity=".7"/>
         <ellipse cx="285" cy="40" rx="24" ry="11" fill="#EFF7EE" opacity=".7"/>
-        <ellipse cx="30" cy="390" rx="26" ry="14" fill="var(--sage)" opacity=".35"/>
-        <ellipse cx="315" cy="360" rx="22" ry="12" fill="var(--sage)" opacity=".35"/>
+        <ellipse cx="30" cy="436" rx="26" ry="14" fill="var(--sage)" opacity=".35"/>
+        <ellipse cx="315" cy="405" rx="22" ry="12" fill="var(--sage)" opacity=".35"/>
 
-        <!-- chemin reliant les bâtiments -->
-        <path d="M170 237 L170 258 M90 258 L250 258 M90 258 L90 232 M250 258 L250 232"
+        <!-- chemin reliant les bâtiments, convergeant à la poussinière -->
+        <path d="M170 237 L170 300 M90 300 L250 300 M90 300 L90 288 M250 300 L250 288"
               stroke="var(--track)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 
         <!-- hippodrome : piste -->
@@ -309,37 +316,48 @@
         <path d="M170 232 v-24" stroke="var(--ink-soft)" stroke-width="3" stroke-linecap="round"/>
         <path d="M170 208 l16 6 -16 6z" fill="var(--gold)"/>
 
+        <!-- poussinière : petit enclos rond au carrefour des chemins -->
+        <circle cx="170" cy="300" r="32" fill="var(--gold-tint)" stroke="var(--gold-dark)" stroke-width="3" stroke-dasharray="4 5"/>
+        <polygon points="148,288 192,288 170,263" fill="var(--pink-dark)"/>
+        <rect x="155" y="288" width="30" height="20" rx="5" fill="var(--cream-ruff)"/>
+        <circle cx="170" cy="300" r="6" fill="var(--ink)"/>
+        <circle cx="147" cy="317" r="5" fill="var(--gold)"/>
+        <circle cx="149" cy="315" r="1" fill="var(--ink)"/>
+
         <!-- écurie -->
-        <polygon points="40,230 140,230 90,182" fill="var(--gold-dark)"/>
-        <rect x="48" y="230" width="84" height="68" rx="6" fill="var(--cream-ruff)"/>
-        <circle cx="90" cy="207" r="9" fill="var(--sky-tint)" stroke="var(--gold-dark)" stroke-width="2"/>
-        <rect x="78" y="263" width="24" height="35" rx="12" fill="var(--pink-dark)"/>
+        <polygon points="40,288 140,288 90,240" fill="var(--gold-dark)"/>
+        <rect x="48" y="288" width="84" height="68" rx="6" fill="var(--cream-ruff)"/>
+        <circle cx="90" cy="265" r="9" fill="var(--sky-tint)" stroke="var(--gold-dark)" stroke-width="2"/>
+        <rect x="78" y="321" width="24" height="35" rx="12" fill="var(--pink-dark)"/>
 
         <!-- marché -->
         <g clip-path="url(#awningClip)">
-          <rect x="202" y="198" width="16" height="32" fill="var(--gold)"/>
-          <rect x="218" y="198" width="16" height="32" fill="var(--gold-tint)"/>
-          <rect x="234" y="198" width="16" height="32" fill="var(--gold)"/>
-          <rect x="250" y="198" width="16" height="32" fill="var(--gold-tint)"/>
-          <rect x="266" y="198" width="16" height="32" fill="var(--gold)"/>
-          <rect x="282" y="198" width="16" height="32" fill="var(--gold-tint)"/>
+          <rect x="202" y="256" width="16" height="32" fill="var(--gold)"/>
+          <rect x="218" y="256" width="16" height="32" fill="var(--gold-tint)"/>
+          <rect x="234" y="256" width="16" height="32" fill="var(--gold)"/>
+          <rect x="250" y="256" width="16" height="32" fill="var(--gold-tint)"/>
+          <rect x="266" y="256" width="16" height="32" fill="var(--gold)"/>
+          <rect x="282" y="256" width="16" height="32" fill="var(--gold-tint)"/>
         </g>
-        <rect x="208" y="230" width="84" height="50" rx="6" fill="var(--sky-tint)" stroke="var(--sky-dark)" stroke-width="1.5"/>
-        <circle cx="228" cy="238" r="6" fill="var(--pink)"/>
-        <circle cx="250" cy="236" r="6" fill="var(--gold)"/>
-        <circle cx="272" cy="238" r="6" fill="var(--sage)"/>
+        <rect x="208" y="288" width="84" height="50" rx="6" fill="var(--sky-tint)" stroke="var(--sky-dark)" stroke-width="1.5"/>
+        <circle cx="228" cy="296" r="6" fill="var(--pink)"/>
+        <circle cx="250" cy="294" r="6" fill="var(--gold)"/>
+        <circle cx="272" cy="296" r="6" fill="var(--sage)"/>
       </svg>
 
-      <button class="hub-hotspot" id="hotspotParier" style="left:29%;top:3%;width:42%;height:26%;">
+      <button class="hub-hotspot" id="hotspotParier" style="left:29%;top:3%;width:42%;height:19%;">
         <span class="hub-hotspot-label">🎟️ Parier</span>
       </button>
-      <a class="hub-hotspot" id="hotspotCourir" href="index.html" style="left:6%;top:26%;width:88%;height:22%;">
+      <a class="hub-hotspot" id="hotspotCourir" href="index.html" style="left:6%;top:22%;width:88%;height:26%;">
         <span class="hub-hotspot-label">🏁 Courir</span>
       </a>
-      <button class="hub-hotspot" id="hotspotEcurie" style="left:10%;top:43%;width:33%;height:29%;">
+      <button class="hub-hotspot" id="hotspotEcurie" style="left:12%;top:51%;width:30%;height:25%;">
         <span class="hub-hotspot-label">🏠 Écurie</span>
       </button>
-      <button class="hub-hotspot" id="hotspotMarche" style="left:57%;top:47%;width:33%;height:22%;">
+      <button class="hub-hotspot" id="hotspotPoussiniere" style="left:41%;top:57%;width:19%;height:14%;">
+        <span class="hub-hotspot-label">🐣</span>
+      </button>
+      <button class="hub-hotspot" id="hotspotMarche" style="left:58%;top:54%;width:30%;height:17%;">
         <span class="hub-hotspot-label">🛒 Marché</span>
       </button>
     </div>
@@ -479,6 +497,22 @@
     </div>
   </div>
 
+  <!-- ---------- Écran 3 : poussinière ---------- -->
+  <div class="screen hidden" id="screenPoussiniere">
+    <div class="fiche-topbar">
+      <button class="back-btn" id="poussiniereBackBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+        Hub
+      </button>
+    </div>
+    <div class="ecurie-header">
+      <p class="ecurie-title">Poussinière</p>
+      <span class="ecurie-count" id="poussiniereCount"></span>
+    </div>
+    <p class="poussiniere-hint">Trop jeunes pour l'écurie — soignez-les jusqu'au stade Jeune pour qu'ils vous rejoignent.</p>
+    <div class="ecurie-list" id="poussiniereList"></div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
 </div>
@@ -518,14 +552,24 @@
       pedigree:[ {name:"Bolt", trait:"Ambitieuse"}, {name:"Comète", trait:"Têtue"} ]
     },
     {
-      id:"nougat", name:"Nougat", stage:"Poussin", coat:"Sable", trait:"Froussarde", capital:0,
-      stats:{ speed:null, endurance:null, agility:null },
-      pedigree:[ {name:"Griotte", trait:"Parano"}, {name:"Sable", trait:"Ambitieuse"} ]
-    },
-    {
       id:"silex", name:"Silex", stage:"Adulte", coat:"Gris", trait:"Parano", capital:45,
       stats:{ speed:59, endurance:66, agility:52 },
       pedigree:null
+    }
+  ];
+
+  // Poussinière : les poussins ne rejoignent l'écurie qu'une fois prêts (stade Jeune).
+  // Pas de minuteur temps réel (cohérent avec rapport §8.1 "pas de timers") — la
+  // maturation avance par soins (Entretien) donnés par le joueur, jusqu'à soinsNeeded.
+  const SOINS_NEEDED = 5;
+  const POUSSINS = [
+    {
+      id:"nougat", name:"Nougat", coat:"Sable", trait:"Froussarde", soins:2,
+      pedigree:[ {name:"Griotte", trait:"Parano"}, {name:"Sable", trait:"Ambitieuse"} ]
+    },
+    {
+      id:"reglisse", name:"Réglisse", coat:"Noir", trait:"Têtue", soins:4,
+      pedigree:[ {name:"Comète", trait:"Têtue"}, {name:"Silex", trait:"Parano"} ]
     }
   ];
 
@@ -534,10 +578,11 @@
   const screenHub = document.getElementById("screenHub");
   const screenEcurie = document.getElementById("screenEcurie");
   const screenFiche = document.getElementById("screenFiche");
+  const screenPoussiniere = document.getElementById("screenPoussiniere");
   const ostrichAvatarSvg = document.getElementById("ficheAvatarSvg").outerHTML;
 
   function showScreen(target){
-    [screenHub, screenEcurie, screenFiche].forEach(s => s.classList.toggle("hidden", s !== target));
+    [screenHub, screenEcurie, screenFiche, screenPoussiniere].forEach(s => s.classList.toggle("hidden", s !== target));
   }
 
   function renderHub(){
@@ -578,6 +623,76 @@
       card.addEventListener("click", () => openFiche(o.id));
       list.appendChild(card);
     });
+  }
+
+  // Poussinière : soins jusqu'à SOINS_NEEDED (pas de minuteur, cf. commentaire sur POUSSINS),
+  // puis transfert dans OSTRICHES au stade Jeune.
+  function poussiniereCardHTML(p){
+    const style = TRAIT_STYLE[p.trait];
+    const ready = p.soins >= SOINS_NEEDED;
+    return `
+      <div class="ecurie-avatar poussin-avatar" style="background:${style.tint};">
+        <div style="filter:${style.filter};display:flex;">${ostrichAvatarSvg}</div>
+      </div>
+      <div class="ecurie-info">
+        <p class="ecurie-name">${p.name}</p>
+        <div class="ecurie-chips">
+          <span class="chip stage-poussin">Poussin</span>
+          <span class="chip trait">${p.trait}</span>
+        </div>
+        <div class="ecurie-capital">
+          <div class="ecurie-capital-track"><div class="ecurie-capital-fill poussin-fill" style="width:${p.soins/SOINS_NEEDED*100}%;"></div></div>
+          <span class="ecurie-capital-value">${p.soins}/${SOINS_NEEDED} soins</span>
+        </div>
+      </div>
+      <button class="btn ${ready ? "btn-primary" : "btn-outline"} btn-compact" data-id="${p.id}">
+        ${ready ? "Accueillir" : "Soigner"}
+      </button>`;
+  }
+
+  function renderPoussiniereList(){
+    document.getElementById("poussiniereCount").textContent = `${POUSSINS.length} poussin${POUSSINS.length > 1 ? "s" : ""}`;
+    const list = document.getElementById("poussiniereList");
+    list.innerHTML = "";
+    if(POUSSINS.length === 0){
+      list.innerHTML = `<p class="poussiniere-empty">Aucun poussin pour le moment — ils apparaissent ici après une Reproduction.</p>`;
+      return;
+    }
+    POUSSINS.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "ecurie-card";
+      card.innerHTML = poussiniereCardHTML(p);
+      card.querySelector("[data-id]").addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(p.soins >= SOINS_NEEDED) graduatePoussin(p.id);
+        else soinPoussin(p.id);
+      });
+      list.appendChild(card);
+    });
+  }
+
+  function soinPoussin(id){
+    const p = POUSSINS.find(x => x.id === id);
+    if(!p || p.soins >= SOINS_NEEDED) return;
+    p.soins++;
+    const readyNote = p.soins >= SOINS_NEEDED ? " — prêt à rejoindre l'écurie !" : "";
+    showToast(`${p.name} +1 soin (${p.soins}/${SOINS_NEEDED})${readyNote}`);
+    renderPoussiniereList();
+  }
+
+  function graduatePoussin(id){
+    const idx = POUSSINS.findIndex(x => x.id === id);
+    if(idx === -1) return;
+    const p = POUSSINS[idx];
+    POUSSINS.splice(idx, 1);
+    OSTRICHES.push({
+      id:p.id, name:p.name, stage:"Jeune", coat:p.coat, trait:p.trait, capital:0,
+      stats:{ speed:null, endurance:null, agility:null },
+      pedigree:p.pedigree
+    });
+    showToast(`${p.name} rejoint l'écurie !`);
+    renderPoussiniereList();
+    renderEcurieList();
   }
 
   function pedigreeParentHTML(p){
@@ -644,13 +759,7 @@
     document.getElementById("pedigreeBtn").setAttribute("aria-expanded", "false");
 
     document.getElementById("btnEntretien").onclick = () => showToast(`Entretien effectué sur ${o.name} — endurance restaurée !`);
-    document.getElementById("btnReproduire").onclick = () => {
-      if(o.stage === "Poussin"){
-        showToast(`${o.name} est trop jeune pour se reproduire`);
-      } else {
-        showToast(`Choisis un second parent pour reproduire ${o.name}`);
-      }
-    };
+    document.getElementById("btnReproduire").onclick = () => showToast(`Choisis un second parent pour reproduire ${o.name}`);
     document.getElementById("btnVendre").onclick = () => showToast(`${o.name} est mise en vente sur le marché`);
 
     showScreen(screenFiche);
@@ -658,7 +767,9 @@
 
   document.getElementById("backBtn").addEventListener("click", () => showScreen(screenEcurie));
   document.getElementById("ecurieBackBtn").addEventListener("click", () => showScreen(screenHub));
+  document.getElementById("poussiniereBackBtn").addEventListener("click", () => showScreen(screenHub));
   document.getElementById("hotspotEcurie").addEventListener("click", () => showScreen(screenEcurie));
+  document.getElementById("hotspotPoussiniere").addEventListener("click", () => showScreen(screenPoussiniere));
   document.getElementById("hotspotMarche").addEventListener("click", () =>
     showToast("Marché — bientôt disponible (parcours pas encore implémenté)"));
   document.getElementById("hotspotParier").addEventListener("click", () =>
@@ -682,6 +793,7 @@
 
   renderHub();
   renderEcurieList();
+  renderPoussiniereList();
 })();
 </script>
 
