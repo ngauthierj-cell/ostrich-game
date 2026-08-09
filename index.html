@@ -275,6 +275,8 @@
       hitFlashT:0,                 // retour visuel bref (pattes) au moment d'un obstacle heurté
       bumpFlashT:0,                // retour visuel bref (corps) au moment d'une bousculade avec une Ambitieuse
       bumpCooldown:0,              // anti-répétition pour la collision avec une Ambitieuse
+      scareFlashT:0,               // retour visuel bref (tête, "!") au sursaut de Froussarde
+      scareCooldown:0,             // anti-répétition pour le sursaut de Froussarde
       hitObstacles: new Set(),     // obstacles déjà traités (heurtés ou esquivés)
       dodgeDecisions: new Map()    // IA seulement : décision d'esquive par obstacle
     };
@@ -437,6 +439,18 @@
       // ralentit près des obstacles (n'importe lequel, pas juste dans son couloir)
       const near = obstacles.find(o => !r.hitObstacles.has(o) && o.progress - r.progress > 0 && o.progress - r.progress < 380);
       if(near) mult *= 0.88;
+      // effrayée par un autre coureur qui la double de trop près : sursaut léger (cf. rapport,
+      // faible sur les courses à plusieurs concurrents "plus d'événements surprises")
+      if(r.scareCooldown <= 0){
+        const scary = racers.find(o => o !== r && !o.finished && Math.abs(o.progress - r.progress) < 45 && Math.abs(o.lane - r.lane) < 0.18);
+        if(scary){
+          r.stumbleT = Math.max(r.stumbleT, 0.25);
+          r.stumbleMult = Math.min(r.stumbleMult, 0.85);
+          r.targetLane = Math.max(0, Math.min(1, r.targetLane + (scary.lane < r.lane ? 0.18 : -0.18)));
+          r.scareFlashT = 0.5;
+          r.scareCooldown = 1.5;
+        }
+      }
     }
     // Têtue : réagit plus lentement aux directions — voir laneLerpRate dans updateRacer.
     // Réaction aux événements dynamiques (sprint imprévisible de Froussarde, etc.) : voir triggerSurpriseEvent.
@@ -591,6 +605,8 @@
     if(r.hitFlashT > 0) r.hitFlashT -= dt;
     if(r.bumpFlashT > 0) r.bumpFlashT -= dt;
     if(r.bumpCooldown > 0) r.bumpCooldown -= dt;
+    if(r.scareFlashT > 0) r.scareFlashT -= dt;
+    if(r.scareCooldown > 0) r.scareCooldown -= dt;
     const timing = matchTiming(r.match);
 
     if(isPlayer){
@@ -866,6 +882,17 @@
       ctx.font = "bold 12px Fredoka, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("Boum !", screenX, bodyY-16);
+    }
+
+    // sursaut de Froussarde effrayée par un coureur proche : repère sur la tête, distinct
+    // des pattes (obstacles) et du corps (bousculade). Visible pour tous les coureurs.
+    if(r.scareFlashT > 0){
+      const a = r.scareFlashT / 0.5;
+      const headY = y - bob - 30;
+      ctx.fillStyle = "rgba(184,90,80,"+(0.5+a*0.5)+")";
+      ctx.font = "bold 14px Fredoka, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("!", screenX+10, headY - a*4);
     }
 
     ctx.save();
