@@ -166,11 +166,12 @@
   "use strict";
 
   /* ---------- Constantes de jeu ---------- */
-  const TRACK_LENGTH   = 8800;
+  const TRACK_LENGTH   = 6000;
   const BASE_SPEED     = 175;
   const MAX_SPEED      = 270;
   const REST_SPEED     = 95;
-  const SCALE           = 0.9; // px écran par unité d'écart de progression (autruches, obstacles, ligne d'arrivée)
+  const SCALE           = 1.3; // px écran par unité d'écart de progression (autruches, obstacles, ligne d'arrivée)
+  const RACER_COUNT     = 5;   // nombre total de coureurs (joueur + IA) -> nombre de couloirs affichés
 
   const TRAITS = ["Têtue","Ambitieuse","Parano","Froussarde"];
   // Matching trait <-> format de piste (rapport de concept §7.1) : fixe, pas aléatoire.
@@ -300,7 +301,7 @@
   function setupRace(){
     racers = [];
     racers.push(makeRacer(true, chosenTrait, chosenMatch, COLORS.player, 1));
-    for(let i=0;i<4;i++){
+    for(let i=0;i<RACER_COUNT-1;i++){
       const t = TRAITS[Math.floor(Math.random()*TRAITS.length)];
       const skill = 0.88 + Math.random()*0.34; // IA plus relevée : peut approcher/dépasser un joueur régulier
       racers.push(makeRacer(false, t, SPRINT_MATCH[t], COLORS.ai[i], skill));
@@ -470,7 +471,7 @@
   // Contrairement aux obstacles fixes, l'événement se déclenche pour tous au même instant
   // (elapsedTime), mais frappe un couloir précis, tiré au sort — comme un obstacle mobile,
   // il faut réellement en sortir pour l'éviter, sinon il active l'Autruchomètre.
-  const HAWK_SWEEP_DUR = 1.4;                  // durée totale du survol en V (piqué puis remontée)
+  const HAWK_SWEEP_DUR = 1.8;                  // durée totale du survol en V (piqué puis remontée)
   const EVENT_REACT_DELAY = HAWK_SWEEP_DUR/2;  // résolution au point bas du piqué, milieu du survol
   function triggerSurpriseEvent(r, dangerLane){
     if(r.finished) return;
@@ -624,6 +625,8 @@
       ctx.fill();
     }
 
+    drawLaneMarkers();
+
     // stries de sol défilantes : donnent la sensation de vitesse (deux profondeurs de parallaxe)
     ctx.strokeStyle = "rgba(150,105,45,.35)";
     ctx.lineWidth = 3; ctx.lineCap = "round";
@@ -679,6 +682,24 @@
     ctx.font = "bold 14px Fredoka, sans-serif";
     ctx.textAlign = "left";  ctx.fillText("⚠", 8, y+5);
     ctx.textAlign = "right"; ctx.fillText("⚠", W-8, y+5);
+  }
+
+  function drawLaneMarkers(){
+    // délimitation visuelle des couloirs, un de plus que d'écarts entre les RACER_COUNT coureurs
+    const rect = trackRectPx();
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,251,243,.5)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([16,12]);
+    ctx.lineDashOffset = -(bgScroll % 28);
+    for(let i=1;i<RACER_COUNT;i++){
+      const y = rect.top + (i/RACER_COUNT)*rect.height;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function drawSprintFlash(){
