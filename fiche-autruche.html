@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Écurie — Bolt</title>
+<title>Ostrich — Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -83,6 +83,54 @@
   .ecurie-capital-value{font-size:10px;font-weight:800;color:var(--text-secondary);flex-shrink:0;}
   .ecurie-chevron{color:var(--text-muted);flex-shrink:0;}
   .ecurie-chevron svg{width:18px;height:18px;}
+
+  /* ---------- Écran hub central ---------- */
+  .hub-topbar{display:flex;align-items:center;justify-content:space-between;margin:2px 4px 18px;}
+  .hub-title{font-family:'Fredoka',sans-serif;font-weight:700;font-size:24px;color:var(--ink);margin:0;}
+  .hub-resources{display:flex;gap:8px;}
+  .resource-pill{
+    display:flex;align-items:center;gap:5px;
+    background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-pill);
+    padding:5px 11px;font-size:12px;font-weight:800;color:var(--ink-soft);
+    box-shadow:0 4px 12px -8px rgba(34,31,44,.3);
+  }
+  .hub-vignette{
+    display:flex;align-items:center;gap:12px;
+    background:var(--card-bg);border:1px solid var(--border);border-radius:18px;
+    padding:12px 14px;cursor:pointer;margin-bottom:12px;
+    box-shadow:0 8px 20px -16px rgba(34,31,44,.35);
+    transition:transform .12s ease;
+  }
+  .hub-vignette:active{transform:scale(.98);}
+  .hub-vignette-avatars{display:flex;flex-shrink:0;}
+  .hub-vignette-avatars .mini-avatar{
+    width:38px;height:38px;border-radius:12px;flex-shrink:0;
+    border:2px solid var(--card-bg);box-shadow:0 0 0 1px var(--border);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    margin-left:-12px;background:var(--track);
+  }
+  .hub-vignette-avatars .mini-avatar:first-child{margin-left:0;}
+  .hub-vignette-avatars .mini-avatar svg{width:34px;height:34px;}
+  .hub-vignette-avatars .mini-avatar.more{font-size:11px;font-weight:800;color:var(--text-secondary);}
+  .hub-vignette-info{flex:1;min-width:0;}
+  .hub-vignette-title{font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--ink);margin:0 0 2px;}
+  .hub-vignette-sub{font-size:12px;color:var(--text-secondary);margin:0;}
+
+  .hub-tiles{display:flex;flex-direction:column;gap:8px;}
+  .hub-tile{
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
+    border-radius:16px;padding:14px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:transform .12s ease, filter .12s ease;border:none;
+    text-decoration:none;box-sizing:border-box;
+  }
+  .hub-tile:active{transform:translateY(2px);}
+  .hub-tile svg{width:19px;height:19px;flex-shrink:0;}
+  .hub-tile-primary{background:var(--gold);color:#5A3607;font-size:15px;padding:16px;}
+  .hub-tile-primary:hover{filter:brightness(1.03);}
+  .hub-tile-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .hub-tile-outline{background:#fff;border:1.5px solid var(--border);color:var(--ink-soft);}
+  .hub-tile-outline:hover{filter:brightness(.98);}
 
   /* ---------- Écran fiche détail ---------- */
   .fiche-topbar{margin:0 2px 10px;}
@@ -212,26 +260,72 @@
   }
   .btn-primary:hover{filter:brightness(1.03);}
 
-  /* toast */
+  /* toast (position fixe : partagé par les 3 écrans) */
   .toast{
-    position:absolute;left:50%;bottom:14px;transform:translate(-50%,12px);
+    position:fixed;left:50%;bottom:28px;transform:translate(-50%,12px);
     background:var(--ink);color:#fff;font-size:12px;font-weight:700;
     padding:9px 16px;border-radius:var(--radius-pill);white-space:nowrap;
     opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;
     box-shadow:0 8px 20px -8px rgba(0,0,0,.4);
     max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;
+    z-index:50;
   }
   .toast.show{opacity:1;transform:translate(-50%,0);}
 </style>
 </head>
 <body>
 
-<h2 class="sr-only">Écurie du joueur : liste des autruches possédées, avec accès à la fiche détail de chacune.</h2>
+<h2 class="sr-only">Hub central du jeu : ressources, écurie du joueur, et accès Courir/Écurie/Marché.</h2>
 
 <div class="app">
 
+  <!-- ---------- Écran 0 : hub central (point d'entrée, rapport §11) ---------- -->
+  <div class="screen" id="screenHub">
+    <div class="hub-topbar">
+      <p class="hub-title">Ostrich</p>
+      <div class="hub-resources">
+        <span class="resource-pill">🪙 <span id="hubPicaillons"></span></span>
+        <span class="resource-pill">💎 <span id="hubPepites"></span></span>
+      </div>
+    </div>
+
+    <div class="hub-vignette" id="hubVignette">
+      <div class="hub-vignette-avatars" id="hubVignetteAvatars"></div>
+      <div class="hub-vignette-info">
+        <p class="hub-vignette-title">Mon écurie</p>
+        <p class="hub-vignette-sub" id="hubVignetteSub"></p>
+      </div>
+      <div class="ecurie-chevron">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </div>
+    </div>
+
+    <div class="hub-tiles">
+      <a class="hub-tile hub-tile-primary" id="tileCourir" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 4h11l-2 4 2 4H5"/></svg>
+        Courir
+      </a>
+      <div class="hub-tile-row">
+        <button class="hub-tile hub-tile-outline" id="tileEcurie">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+          Écurie
+        </button>
+        <button class="hub-tile hub-tile-outline" id="tileMarche">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.8h7.6a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="9" cy="20" r="1.3" fill="currentColor" stroke="none"/><circle cx="17" cy="20" r="1.3" fill="currentColor" stroke="none"/></svg>
+          Marché
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ---------- Écran 1 : vue d'ensemble écurie ---------- -->
-  <div class="screen" id="screenEcurie">
+  <div class="screen hidden" id="screenEcurie">
+    <div class="fiche-topbar">
+      <button class="back-btn" id="ecurieBackBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+        Hub
+      </button>
+    </div>
     <div class="ecurie-header">
       <p class="ecurie-title">Mon écurie</p>
       <span class="ecurie-count" id="ecurieCount"></span>
@@ -355,10 +449,10 @@
         </div>
       </div>
 
-      <div class="toast" id="toast"></div>
-
     </div>
   </div>
+
+  <div class="toast" id="toast"></div>
 
 </div>
 
@@ -408,9 +502,31 @@
     }
   ];
 
+  const HUB_RESOURCES = { picaillons:340, pepites:12 }; // monnaies mock (rapport §9.1)
+
+  const screenHub = document.getElementById("screenHub");
   const screenEcurie = document.getElementById("screenEcurie");
   const screenFiche = document.getElementById("screenFiche");
   const ostrichAvatarSvg = document.getElementById("ficheAvatarSvg").outerHTML;
+
+  function showScreen(target){
+    [screenHub, screenEcurie, screenFiche].forEach(s => s.classList.toggle("hidden", s !== target));
+  }
+
+  function renderHub(){
+    document.getElementById("hubPicaillons").textContent = HUB_RESOURCES.picaillons;
+    document.getElementById("hubPepites").textContent = HUB_RESOURCES.pepites;
+
+    const avatarsWrap = document.getElementById("hubVignetteAvatars");
+    const shown = OSTRICHES.slice(0, 3);
+    avatarsWrap.innerHTML = shown.map(o => {
+      const style = TRAIT_STYLE[o.trait];
+      return `<div class="mini-avatar" style="background:${style.tint};"><div style="filter:${style.filter};display:flex;">${ostrichAvatarSvg}</div></div>`;
+    }).join("") + (OSTRICHES.length > shown.length ? `<div class="mini-avatar more">+${OSTRICHES.length - shown.length}</div>` : "");
+
+    document.getElementById("hubVignetteSub").textContent =
+      `${OSTRICHES.length} autruche${OSTRICHES.length > 1 ? "s" : ""} — voir le détail`;
+  }
 
   function ecurieCardHTML(o){
     const style = TRAIT_STYLE[o.trait];
@@ -520,16 +636,15 @@
     };
     document.getElementById("btnVendre").onclick = () => showToast(`${o.name} est mise en vente sur le marché`);
 
-    screenEcurie.classList.add("hidden");
-    screenFiche.classList.remove("hidden");
+    showScreen(screenFiche);
   }
 
-  function closeFiche(){
-    screenFiche.classList.add("hidden");
-    screenEcurie.classList.remove("hidden");
-  }
-
-  document.getElementById("backBtn").addEventListener("click", closeFiche);
+  document.getElementById("backBtn").addEventListener("click", () => showScreen(screenEcurie));
+  document.getElementById("ecurieBackBtn").addEventListener("click", () => showScreen(screenHub));
+  document.getElementById("hubVignette").addEventListener("click", () => showScreen(screenEcurie));
+  document.getElementById("tileEcurie").addEventListener("click", () => showScreen(screenEcurie));
+  document.getElementById("tileMarche").addEventListener("click", () =>
+    showToast("Marché — bientôt disponible (parcours pas encore implémenté)"));
 
   const pedigreeBtn = document.getElementById("pedigreeBtn");
   const pedigreePanel = document.getElementById("pedigreePanel");
@@ -547,6 +662,7 @@
     toastTimeout = setTimeout(() => toast.classList.remove("show"), 2200);
   }
 
+  renderHub();
   renderEcurieList();
 })();
 </script>
