@@ -434,7 +434,7 @@
   function obstacleEffect(o, r){
     let hitRadius = o.hitRadius, stumbleDur = o.stumbleDur, speedMult = o.speedMult;
     if(r.trait === "Parano") hitRadius *= 0.55;
-    if(r.trait === "Têtue"){ stumbleDur *= 0.5; speedMult = 1 - (1-speedMult)*0.5; }
+    if(r.trait === "Têtue"){ stumbleDur *= 0.8; speedMult = 1 - (1-speedMult)*0.2; } // résistance allégée : les obstacles doivent encore la ralentir
     return { hitRadius, stumbleDur, speedMult };
   }
   function nextObstacleAhead(r, lookahead){
@@ -539,8 +539,8 @@
 
     if(!isPlayer) aiObstacleReaction(r);
 
-    // couloir : interpolation douce vers la cible (Têtue réagit plus lentement aux directions)
-    const laneLerpRate = r.trait === "Têtue" ? 3 : 6;
+    // couloir : interpolation douce vers la cible (Têtue réagit beaucoup plus lentement aux directions)
+    const laneLerpRate = r.trait === "Têtue" ? 2 : 6;
     r.lane += (r.targetLane - r.lane) * Math.min(1, dt*laneLerpRate);
 
     let behaviorMult = applyTraitBehavior(r, dt);
