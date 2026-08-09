@@ -843,24 +843,26 @@
       ctx.beginPath(); ctx.ellipse(screenX-50, y-4-bob, 20, 7, 0, 0, Math.PI*2); ctx.fill();
     }
 
-    // flash d'impact centré sur les pattes : seule partie réellement touchée par le choc
+    // flash d'impact centré sur les pieds : seule partie réellement touchée par le choc.
+    // Positionné bas et resserré pour ne pas empiéter visuellement sur le corps (qui
+    // descend jusqu'à screenY+16 environ).
     if(r.hitFlashT > 0){
       const a = r.hitFlashT / 0.35;
-      const legY = y + 17;
+      const legY = y + 24;
       ctx.strokeStyle = "rgba(255,255,255,"+(0.4+a*0.5)+")";
       ctx.lineWidth = 2;
       for(let i=0;i<5;i++){
         const ang = (i/5)*Math.PI*2;
         ctx.beginPath();
-        ctx.moveTo(screenX+Math.cos(ang)*9, legY+Math.sin(ang)*7);
-        ctx.lineTo(screenX+Math.cos(ang)*(9+7*a), legY+Math.sin(ang)*(7+7*a));
+        ctx.moveTo(screenX+Math.cos(ang)*6, legY+Math.sin(ang)*5);
+        ctx.lineTo(screenX+Math.cos(ang)*(6+5*a), legY+Math.sin(ang)*(5+5*a));
         ctx.stroke();
       }
       if(isPlayer){
         ctx.fillStyle = "rgba(184,90,80,"+(0.55+a*0.45)+")";
         ctx.font = "bold 12px Fredoka, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Aïe !", screenX, legY+22);
+        ctx.fillText("Aïe !", screenX, legY+18);
       }
     }
 
