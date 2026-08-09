@@ -167,10 +167,10 @@
 
   /* ---------- Constantes de jeu ---------- */
   const TRACK_LENGTH   = 8800;
-  const BASE_SPEED     = 110;
+  const BASE_SPEED     = 175;
   const MAX_SPEED      = 270;
   const REST_SPEED     = 95;
-  const SCALE           = 0.5; // px écran par unité d'écart de progression (autruches, obstacles, ligne d'arrivée)
+  const SCALE           = 0.9; // px écran par unité d'écart de progression (autruches, obstacles, ligne d'arrivée)
 
   const TRAITS = ["Têtue","Ambitieuse","Parano","Froussarde"];
   // Matching trait <-> format de piste (rapport de concept §7.1) : fixe, pas aléatoire.
@@ -215,6 +215,7 @@
   let lastTs = 0;
   let bgScroll = 0;
   let shake = 0;
+  let sprintFlashT = 0; // retour visuel plein écran au déclenchement du sprint
 
   /* ---------- Canvas ---------- */
   const canvas = document.getElementById("race");
@@ -301,7 +302,7 @@
     racers.push(makeRacer(true, chosenTrait, chosenMatch, COLORS.player, 1));
     for(let i=0;i<4;i++){
       const t = TRAITS[Math.floor(Math.random()*TRAITS.length)];
-      const skill = 0.9 + Math.random()*0.22;
+      const skill = 0.88 + Math.random()*0.34; // IA plus relevée : peut approcher/dépasser un joueur régulier
       racers.push(makeRacer(false, t, SPRINT_MATCH[t], COLORS.ai[i], skill));
     }
     obstacles = generateObstacles();
@@ -309,6 +310,7 @@
     hawkT = 0;
     activeDangerLane = null;
     dangerWarnT = 0;
+    sprintFlashT = 0;
     elapsedTime = 0;
     raceFinished = false;
     bgScroll = 0;
@@ -374,7 +376,8 @@
     if(player.stamina > 0.12 && player.sprintCooldown <= 0){
       player.sprintT = 1.1;
       player.sprintCooldown = 0.9 * matchTiming(player.match).sprintCooldownMult;
-      shake = 6;
+      shake = 12;
+      sprintFlashT = 0.3;
     }
   }
 
@@ -467,7 +470,8 @@
   // Contrairement aux obstacles fixes, l'événement se déclenche pour tous au même instant
   // (elapsedTime), mais frappe un couloir précis, tiré au sort — comme un obstacle mobile,
   // il faut réellement en sortir pour l'éviter, sinon il active l'Autruchomètre.
-  const EVENT_REACT_DELAY = 0.85; // fenêtre de réaction avant résolution
+  const HAWK_SWEEP_DUR = 1.4;                  // durée totale du survol en V (piqué puis remontée)
+  const EVENT_REACT_DELAY = HAWK_SWEEP_DUR/2;  // résolution au point bas du piqué, milieu du survol
   function triggerSurpriseEvent(r, dangerLane){
     if(r.finished) return;
     const radius = r.trait === "Parano" ? 0.14 : 0.22; // Parano esquive mieux
@@ -515,7 +519,7 @@
         ev.triggered = true;
         ev.dangerLane = Math.random();
         ev.resolveAt = ev.time + EVENT_REACT_DELAY;
-        hawkT = 1.3;
+        hawkT = HAWK_SWEEP_DUR;
         activeDangerLane = ev.dangerLane;
         dangerWarnT = EVENT_REACT_DELAY;
         showEventBanner("🦅 Un rapace fond sur la piste — change de couloir !");
@@ -578,6 +582,7 @@
     elapsedTime += dt;
     bgScroll += racers[0].speed * dt;
     shake = Math.max(0, shake - dt*18);
+    sprintFlashT = Math.max(0, sprintFlashT - dt);
     hawkT = Math.max(0, hawkT - dt);
     dangerWarnT = Math.max(0, dangerWarnT - dt);
     checkEvents();
@@ -643,18 +648,23 @@
   }
   function drawHawkShadow(){
     if(hawkT <= 0) return;
-    const t = 1 - hawkT/1.3; // 0..1, progression du survol
+    const t = 1 - hawkT/HAWK_SWEEP_DUR; // 0..1, progression du survol
     const x = -60 + t*(W+120);
-    const skyY = H*0.10 + Math.sin(t*Math.PI)*8;
-    ctx.strokeStyle = "rgba(20,15,10,.65)"; ctx.lineWidth = 3; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x-18,skyY-6); ctx.lineTo(x,skyY); ctx.lineTo(x+18,skyY-6); ctx.stroke(); // silhouette ailes en V
+    const skyY = H*0.08;
+    // trajectoire en V : fond vers le couloir menacé au milieu du survol, puis remonte
+    const diveFactor = 1 - Math.abs(t-0.5)*2; // 0 aux extrémités (haut du ciel), 1 au point bas
+    const rect = trackRectPx();
+    const diveY = activeDangerLane != null ? rect.top + activeDangerLane*rect.height : skyY;
+    const hawkY = skyY + (diveY - skyY) * diveFactor;
+
+    ctx.strokeStyle = "rgba(20,15,10,.7)"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x-18,hawkY-6); ctx.lineTo(x,hawkY); ctx.lineTo(x+18,hawkY-6); ctx.stroke(); // silhouette ailes
 
     if(activeDangerLane != null){
-      // ombre projetée au sol : suit le vrai couloir menacé, pas une hauteur fixe
-      const rect = trackRectPx();
-      const shadowY = rect.top + activeDangerLane*rect.height;
-      ctx.fillStyle = "rgba(20,15,10,.28)";
-      ctx.beginPath(); ctx.ellipse(x, shadowY, 26, 9, 0, 0, Math.PI*2); ctx.fill();
+      // ombre projetée au sol, plus nette au plus fort du piqué
+      const shadowAlpha = 0.14 + diveFactor*0.26;
+      ctx.fillStyle = "rgba(20,15,10,"+shadowAlpha+")";
+      ctx.beginPath(); ctx.ellipse(x, diveY, 26, 9, 0, 0, Math.PI*2); ctx.fill();
     }
   }
 
@@ -669,6 +679,24 @@
     ctx.font = "bold 14px Fredoka, sans-serif";
     ctx.textAlign = "left";  ctx.fillText("⚠", 8, y+5);
     ctx.textAlign = "right"; ctx.fillText("⚠", W-8, y+5);
+  }
+
+  function drawSprintFlash(){
+    if(sprintFlashT <= 0) return;
+    const a = sprintFlashT / 0.3;
+    const cx = W*0.5, cy = H*0.5;
+    ctx.strokeStyle = "rgba(255,255,255,"+(a*0.55)+")";
+    ctx.lineWidth = 3; ctx.lineCap = "round";
+    const n = 10;
+    for(let i=0;i<n;i++){
+      const ang = (i/n)*Math.PI*2;
+      const rInner = 36 + (1-a)*70;
+      const rOuter = rInner + 26 + a*36;
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(ang)*rInner, cy+Math.sin(ang)*rInner*0.7);
+      ctx.lineTo(cx+Math.cos(ang)*rOuter, cy+Math.sin(ang)*rOuter*0.7);
+      ctx.stroke();
+    }
   }
 
   function drawChecker(x){
@@ -722,7 +750,9 @@
     const rect = trackRectPx();
     const y = rect.top + r.lane*rect.height;
     const c = r.colors;
-    const legSwing = Math.sin(r.legPhase)*10;
+    // en cas de choc, seules les pattes trébuchent (mouvement court et rapide) — le
+    // reste du corps et la tête gardent leur foulée normale
+    const legSwing = r.stumbleT > 0 ? Math.sin(elapsedTime*46 + r.legPhase)*4 : Math.sin(r.legPhase)*10;
     const bob = Math.abs(Math.sin(r.legPhase))*4;
 
     // poussière : intensité liée à la vitesse réelle, pas juste au sprint
@@ -740,36 +770,40 @@
       }
     }
 
-    // traînée de sprint
+    // traînée de sprint : double couche pour un effet "comète" plus marqué
     if(isPlayer && r.sprintT>0){
-      ctx.fillStyle = "rgba(230,140,130,.35)";
-      ctx.beginPath();
-      ctx.ellipse(screenX-26, y-4-bob, 20, 8, 0, 0, Math.PI*2);
-      ctx.fill();
+      ctx.fillStyle = "rgba(230,140,130,.45)";
+      ctx.beginPath(); ctx.ellipse(screenX-30, y-4-bob, 26, 9, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "rgba(230,140,130,.25)";
+      ctx.beginPath(); ctx.ellipse(screenX-50, y-4-bob, 20, 7, 0, 0, Math.PI*2); ctx.fill();
     }
 
-    // flash d'impact au moment où un obstacle est heurté
+    // flash d'impact centré sur les pattes : seule partie réellement touchée par le choc
     if(r.hitFlashT > 0){
       const a = r.hitFlashT / 0.35;
+      const legY = y + 17;
       ctx.strokeStyle = "rgba(255,255,255,"+(0.4+a*0.5)+")";
       ctx.lineWidth = 2;
       for(let i=0;i<5;i++){
         const ang = (i/5)*Math.PI*2;
         ctx.beginPath();
-        ctx.moveTo(screenX+Math.cos(ang)*10, y-14+Math.sin(ang)*10);
-        ctx.lineTo(screenX+Math.cos(ang)*(10+8*a), y-14+Math.sin(ang)*(10+8*a));
+        ctx.moveTo(screenX+Math.cos(ang)*9, legY+Math.sin(ang)*7);
+        ctx.lineTo(screenX+Math.cos(ang)*(9+7*a), legY+Math.sin(ang)*(7+7*a));
         ctx.stroke();
       }
       if(isPlayer){
         ctx.fillStyle = "rgba(184,90,80,"+(0.55+a*0.45)+")";
-        ctx.font = "bold 13px Fredoka, sans-serif";
+        ctx.font = "bold 12px Fredoka, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Aïe !", screenX, y-34);
+        ctx.fillText("Aïe !", screenX, legY+22);
       }
     }
 
     ctx.save();
     ctx.translate(screenX, y - bob);
+    if(isPlayer && r.sprintT > 0){
+      ctx.scale(1.14, 0.92); // étirement "vitesse" pendant le sprint
+    }
 
     // pattes
     ctx.strokeStyle = c.body; ctx.lineWidth = 4; ctx.lineCap = "round";
@@ -832,6 +866,7 @@
     });
 
     ctx.restore();
+    drawSprintFlash();
   }
 
   /* ---------- Boucle principale ---------- */
