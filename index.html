@@ -431,7 +431,7 @@
       let center = 0.5;
       const near = racers.find(o => o !== r && !o.finished && Math.abs(o.progress - r.progress) < 60 && Math.abs(o.lane - r.lane) < 0.25);
       if(near) center = near.lane < r.lane ? Math.min(0.85, r.lane + 0.25) : Math.max(0.15, r.lane - 0.25);
-      r.targetLane = Math.max(0, Math.min(1, center + Math.sin(elapsedTime*3.2 + r.legPhase)*0.42));
+      r.targetLane = Math.max(0, Math.min(1, center + Math.sin(elapsedTime*3.2 + r.legPhase)*0.22));
     }
     if(r.trait === "Froussarde"){
       // ralentit près des obstacles (n'importe lequel, pas juste dans son couloir)
