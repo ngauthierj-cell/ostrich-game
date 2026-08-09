@@ -277,6 +277,8 @@
       bumpCooldown:0,              // anti-répétition pour la collision avec une Ambitieuse
       scareFlashT:0,               // retour visuel bref (tête, "!") au sursaut de Froussarde
       scareCooldown:0,             // anti-répétition pour le sursaut de Froussarde
+      hawkPassed:false,            // Froussarde : coup de fouet déjà donné pour le passage de rapace en cours
+      hawkBoostT:0,                 // Froussarde : minuteur du coup de collier de soulagement (décroît vers 0)
       hitObstacles: new Set(),     // obstacles déjà traités (heurtés ou esquivés)
       dodgeDecisions: new Map()    // IA seulement : décision d'esquive par obstacle
     };
@@ -451,6 +453,24 @@
           r.scareCooldown = 1.5;
         }
       }
+      // compensation : dès que le rapace est passé derrière elle (à l'écran), le
+      // soulagement lui donne un coup de collier (une fois par passage). Agit sur le
+      // multiplicateur de progression, pas sur r.speed : r.speed est déjà plafonné à
+      // MAX_SPEED par les taps du joueur, un simple *1.35 y serait absorbé sans effet.
+      if(hawkT > 0 && !r.hawkPassed){
+        const t = 1 - hawkT/HAWK_SWEEP_DUR;
+        const hawkX = -60 + t*(W+120);
+        const player = racers[0];
+        const racerScreenX = W*0.28 + (r.progress - player.progress)*SCALE;
+        if(hawkX < racerScreenX - 20){
+          r.hawkPassed = true;
+          r.hawkBoostT = 2.2;
+        }
+      }
+      if(r.hawkBoostT > 0){
+        mult *= 1 + 0.9 * (r.hawkBoostT / 2.2);
+        r.hawkBoostT = Math.max(0, r.hawkBoostT - dt);
+      }
     }
     // Têtue : réagit plus lentement aux directions — voir laneLerpRate dans updateRacer.
     // Réaction aux événements dynamiques (sprint imprévisible de Froussarde, etc.) : voir triggerSurpriseEvent.
@@ -577,7 +597,7 @@
         activeDangerLane = ev.dangerLane;
         dangerWarnT = EVENT_REACT_DELAY;
         showEventBanner("🦅 Un rapace fond sur la piste — change de couloir !");
-        racers.forEach(r => { if(!r.isPlayer) aiEventReaction(r, ev.dangerLane); });
+        racers.forEach(r => { r.hawkPassed = false; if(!r.isPlayer) aiEventReaction(r, ev.dangerLane); });
       }
       if(ev.triggered && !ev.resolved && elapsedTime >= ev.resolveAt){
         ev.resolved = true;
