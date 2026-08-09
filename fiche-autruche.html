@@ -189,7 +189,8 @@
   .forme-fill.forme-high{background:var(--sage);}
   .forme-fill.forme-mid{background:var(--gold);}
   .forme-fill.forme-low{background:var(--pink-dark);}
-  .forme-warning{font-size:11px;font-weight:700;color:var(--pink-dark);margin:8px 0 0;}
+  .forme-hint{font-size:10px;color:var(--text-muted);margin:6px 0 0;}
+  .forme-warning{font-size:11px;font-weight:700;color:var(--pink-dark);margin:6px 0 0;}
   .forme-warning.hidden{display:none;}
   .forme-demo-btn{
     display:block;margin:8px 0 0;padding:0;border:none;background:none;
@@ -491,8 +492,9 @@
           <span class="capital-value" id="formeValue"></span>
         </div>
         <div class="capital-track"><div class="capital-fill forme-fill" id="formeFill"></div></div>
+        <p class="forme-hint">Se régénère à 100% chaque jour à 7h, ou instantanément avec Entretien</p>
         <p class="forme-warning hidden" id="formeWarning">⚠ Performance réduite tant qu'elle n'est pas reposée</p>
-        <button class="forme-demo-btn" id="btnSimulerCourse">🏁 Simuler une course (démo — fatigue -30)</button>
+        <button class="forme-demo-btn" id="btnSimulerCourse">🏁 Simuler une course (démo — fatigue -10)</button>
       </div>
 
       <button class="pedigree-btn" id="pedigreeBtn" aria-expanded="false" aria-controls="pedigreePanel">
@@ -564,29 +566,60 @@
     "Parano":     { tint:"var(--sky-tint)",  solid:"#3E6E82", filter:"hue-rotate(150deg) saturate(1.3)" },
     "Froussarde": { tint:"var(--sage-tint)", solid:"#3E6B44", filter:"hue-rotate(70deg) saturate(1.2)" }
   };
-  const STAGE_CAPITAL = 120; // capital course total sur la carrière (rapport §8.2)
+  const STAGE_CAPITAL = 100; // capital course total sur la carrière (rapport §8.2, v11 : 100)
   const STAGE_CLASS = { "Poussin":"stage-poussin", "Jeune":"stage-jeune", "Adulte":"stage-adulte", "Vétérane":"stage-veterane" };
+
+  // Forme du jour (jauge courte, distincte du capital course de carrière §8.2) : chaque
+  // course coûte 10%, elle se régénère seule à 100% une fois par jour à 7h (heure réelle
+  // de l'appareil), et l'Entretien la restaure aussi instantanément en consommant un Fruit
+  // — objet §10, "récupération instantanée de stamina", devenu Rare — pour qui ne veut pas
+  // attendre le prochain reset. Les deux mécaniques coexistent. Contrairement au capital,
+  // la Forme n'est pas affectée par une vraie course ici : index.html (la course jouable)
+  // est un fichier séparé sans état partagé avec l'écurie, donc "Simuler une course" sert
+  // à exercer la mécanique dans ce prototype. Le seuil d'avertissement reste une valeur de
+  // démo à recalibrer ; le coût par course (10%) et l'heure de reset (7h) sont les valeurs
+  // de design données par l'utilisateur, pas des placeholders.
+  const FORME_LOW_THRESHOLD = 50;
+  const FORME_RACE_COST = 10;
+  const FORME_REGEN_HOUR = 7;
+  let fruitsStock = 2; // stock de Fruits du joueur (mock)
+
+  // "Jour de régène" : la journée bascule à 7h plutôt qu'à minuit, donc avant 7h on est
+  // encore rattaché au jour précédent pour cette jauge.
+  function regenDayKey(date){
+    const d = new Date(date.getTime());
+    if(d.getHours() < FORME_REGEN_HOUR) d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function applyDailyFormeRegen(o){
+    const key = regenDayKey(new Date());
+    if(o.lastRegenDay !== key){
+      o.forme = 100;
+      o.lastRegenDay = key;
+    }
+  }
 
   // Roster mock — un représentant par stade de vie (rapport §8.4), pour couvrir les cas
   // d'affichage : stats verrouillées, pedigree inconnu, action Reproduire indisponible...
   const OSTRICHES = [
     {
-      id:"bolt", name:"Bolt", stage:"Adulte", coat:"Pic", trait:"Ambitieuse", capital:62, forme:85,
+      id:"bolt", name:"Bolt", stage:"Adulte", coat:"Pic", trait:"Ambitieuse", capital:52, forme:85, lastRegenDay:regenDayKey(new Date()),
       stats:{ speed:78, endurance:55, agility:null },
       pedigree:[ {name:"Comète", trait:"Têtue"}, {name:"Silex", trait:"Parano"} ]
     },
     {
-      id:"comete", name:"Comète", stage:"Vétérane", coat:"Doré", trait:"Têtue", capital:112, forme:35,
+      id:"comete", name:"Comète", stage:"Vétérane", coat:"Doré", trait:"Têtue", capital:93, forme:35, lastRegenDay:regenDayKey(new Date()),
       stats:{ speed:70, endurance:38, agility:61 },
       pedigree:null
     },
     {
-      id:"griotte", name:"Griotte", stage:"Jeune", coat:"Roux", trait:"Parano", capital:9, forme:100,
+      id:"griotte", name:"Griotte", stage:"Jeune", coat:"Roux", trait:"Parano", capital:8, forme:100, lastRegenDay:regenDayKey(new Date()),
       stats:{ speed:64, endurance:null, agility:null },
       pedigree:[ {name:"Bolt", trait:"Ambitieuse"}, {name:"Comète", trait:"Têtue"} ]
     },
     {
-      id:"silex", name:"Silex", stage:"Adulte", coat:"Gris", trait:"Parano", capital:45, forme:60,
+      id:"silex", name:"Silex", stage:"Adulte", coat:"Gris", trait:"Parano", capital:38, forme:60, lastRegenDay:regenDayKey(new Date()),
       stats:{ speed:59, endurance:66, agility:52 },
       pedigree:null
     }
@@ -608,16 +641,6 @@
   ];
 
   const HUB_RESOURCES = { picaillons:340, pepites:12 }; // monnaies mock (rapport §9.1)
-
-  // Entretien : restaure la Forme du jour (jauge courte, distincte du capital course de
-  // carrière §8.2) en consommant un Fruit — objet §10, "récupération instantanée de
-  // stamina", devenu Rare. Contrairement au capital, la Forme n'est pas affectée par une
-  // vraie course ici : index.html (la course jouable) est un fichier séparé sans état
-  // partagé avec l'écurie, donc "Simuler une course" sert à exercer la mécanique dans ce
-  // prototype. Seuil et perte par course sont des valeurs de démo à recalibrer.
-  const FORME_LOW_THRESHOLD = 50;
-  const FORME_RACE_COST = 30;
-  let fruitsStock = 2; // stock de Fruits du joueur (mock)
 
   const screenHub = document.getElementById("screenHub");
   const screenEcurie = document.getElementById("screenEcurie");
@@ -791,7 +814,7 @@
     const p = POUSSINS[idx];
     POUSSINS.splice(idx, 1);
     OSTRICHES.push({
-      id:p.id, name:p.name, stage:"Jeune", coat:p.coat, trait:p.trait, capital:0, forme:100,
+      id:p.id, name:p.name, stage:"Jeune", coat:p.coat, trait:p.trait, capital:0, forme:100, lastRegenDay:regenDayKey(new Date()),
       stats:{ speed:null, endurance:null, agility:null },
       pedigree:p.pedigree
     });
@@ -862,6 +885,7 @@
   function openFiche(id){
     const o = OSTRICHES.find(x => x.id === id);
     if(!o) return;
+    applyDailyFormeRegen(o);
     const style = TRAIT_STYLE[o.trait];
 
     document.getElementById("ficheAvatar").style.background = style.tint;
