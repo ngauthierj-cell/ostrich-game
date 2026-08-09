@@ -625,15 +625,18 @@
       ctx.fill();
     }
 
-    drawLaneMarkers();
-
-    // stries de sol défilantes : donnent la sensation de vitesse (deux profondeurs de parallaxe)
+    // délimitation des 5 couloirs (RACER_COUNT) : mêmes pointillés défilants que la piste
     ctx.strokeStyle = "rgba(150,105,45,.35)";
     ctx.lineWidth = 3; ctx.lineCap = "round";
     const spacingTrack = 58, offsetTrack = (bgScroll*0.9) % spacingTrack;
-    for(let x = -offsetTrack; x < W+spacingTrack; x += spacingTrack){
-      ctx.beginPath(); ctx.moveTo(x, H*0.55); ctx.lineTo(x+16, H*0.55); ctx.stroke();
+    const laneRect = trackRectPx();
+    for(let i=1;i<RACER_COUNT;i++){
+      const laneY = laneRect.top + (i/RACER_COUNT)*laneRect.height;
+      for(let x = -offsetTrack; x < W+spacingTrack; x += spacingTrack){
+        ctx.beginPath(); ctx.moveTo(x, laneY); ctx.lineTo(x+16, laneY); ctx.stroke();
+      }
     }
+
     ctx.strokeStyle = "rgba(120,80,30,.4)";
     ctx.lineWidth = 5;
     const spacingFront = 90, offsetFront = (bgScroll*1.6) % spacingFront;
@@ -682,24 +685,6 @@
     ctx.font = "bold 14px Fredoka, sans-serif";
     ctx.textAlign = "left";  ctx.fillText("⚠", 8, y+5);
     ctx.textAlign = "right"; ctx.fillText("⚠", W-8, y+5);
-  }
-
-  function drawLaneMarkers(){
-    // délimitation visuelle des couloirs, un de plus que d'écarts entre les RACER_COUNT coureurs
-    const rect = trackRectPx();
-    ctx.save();
-    ctx.strokeStyle = "rgba(150,105,45,.35)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([16,12]);
-    ctx.lineDashOffset = -(bgScroll % 28);
-    for(let i=1;i<RACER_COUNT;i++){
-      const y = rect.top + (i/RACER_COUNT)*rect.height;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
-    }
-    ctx.restore();
   }
 
   function drawSprintFlash(){
