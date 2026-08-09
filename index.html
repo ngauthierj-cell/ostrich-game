@@ -477,8 +477,8 @@
       if(Math.abs(r.lane - o.lane) < eff.hitRadius){
         r.stumbleT = Math.max(r.stumbleT, eff.stumbleDur);
         r.stumbleMult = eff.speedMult;
-        r.hitFlashT = 0.35; // retour visuel de l'impact (voir drawOstrich)
-        if(r.isPlayer) shake = Math.max(shake, 9);
+        r.hitFlashT = 0.35; // retour visuel de l'impact, localisé aux pattes (voir drawOstrich) —
+        // pas de secousse caméra ici : elle ferait trembler tout l'écran, pas seulement les pattes.
       }
     }
   }
