@@ -95,6 +95,16 @@
   }
   .event-banner.show{opacity:1;}
 
+  .sprint-btn{
+    position:absolute;right:16px;bottom:16px;z-index:6;
+    width:76px;height:76px;border-radius:50%;border:3px solid var(--pink-dark);
+    background:radial-gradient(circle at 35% 30%,#F6A79C,#E68C82 60%,#C96D62);
+    color:#fff;font-family:'Fredoka',sans-serif;font-weight:700;font-size:11px;line-height:1.3;
+    box-shadow:0 6px 0 #8E3F37;cursor:pointer;touch-action:none;user-select:none;
+  }
+  .sprint-btn:active{transform:translateY(3px);box-shadow:0 3px 0 #8E3F37;}
+  .sprint-btn.cooling{opacity:.4;filter:grayscale(.6);box-shadow:0 6px 0 rgba(0,0,0,.15);}
+
   #result{
     position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
     background:rgba(246,238,223,.97);padding:28px;text-align:center;
@@ -121,7 +131,7 @@
     <div class="trait-grid" id="traitGrid"></div>
     <div class="match-badge" id="matchBadge"></div>
     <button class="big-btn" id="startBtn">C'est parti !</button>
-    <p class="hint">Tape à un rythme régulier pour accélérer · Glisse le doigt pour te déplacer et éviter trous, cailloux et broussailles · Swipe vers le bas pour sprinter</p>
+    <p class="hint">Tape à un rythme régulier pour accélérer · Glisse le doigt pour te déplacer et éviter trous, cailloux et broussailles · Bouton ⚡ pour sprinter</p>
   </div>
 
   <!-- Bannière événement dynamique -->
@@ -138,6 +148,9 @@
       <div class="hud-track"><div class="stamina-fill" id="staminaFill" style="width:100%"></div></div>
     </div>
   </div>
+
+  <!-- Bouton sprint dédié (en plus du swipe vers le bas) -->
+  <button class="sprint-btn hidden" id="sprintBtn">⚡<br>SPRINT</button>
 
   <!-- Résultats -->
   <div id="result" class="overlay hidden">
@@ -249,6 +262,7 @@
       finished:false,
       finishTime:0,
       stumbleT:0, stumbleMult:1,   // pénalité en cours suite à un obstacle heurté ou un événement
+      hitFlashT:0,                 // retour visuel bref au moment de l'impact
       hitObstacles: new Set(),     // obstacles déjà traités (heurtés ou esquivés)
       dodgeDecisions: new Map()    // IA seulement : décision d'esquive par obstacle
     };
@@ -318,7 +332,7 @@
     if(input.dragging){
       const dt = performance.now() - input.swipeStartT;
       const dy = y - input.swipeStartY;
-      if(dy > 60 && dt < 400){ trySprint(); }
+      if(dy > 40 && dt < 550){ trySprint(); } // swipe vers le bas : alternative au bouton ⚡
     }
     input.dragging = false;
   }
@@ -360,6 +374,9 @@
   canvas.addEventListener("pointerdown", e=>{ e.preventDefault(); pointerDown(e.clientY - app.getBoundingClientRect().top); });
   canvas.addEventListener("pointermove", e=>{ e.preventDefault(); pointerMove(e.clientY - app.getBoundingClientRect().top); });
   window.addEventListener("pointerup", e=>{ pointerUp(e.clientY - app.getBoundingClientRect().top); });
+
+  const sprintBtn = document.getElementById("sprintBtn");
+  sprintBtn.addEventListener("pointerdown", e=>{ e.preventDefault(); e.stopPropagation(); trySprint(); });
 
   function trackRectPx(){
     return { top: H*0.32, height: H*0.4 };
@@ -420,6 +437,8 @@
       if(Math.abs(r.lane - o.lane) < eff.hitRadius){
         r.stumbleT = Math.max(r.stumbleT, eff.stumbleDur);
         r.stumbleMult = eff.speedMult;
+        r.hitFlashT = 0.35; // retour visuel de l'impact (voir drawOstrich)
+        if(r.isPlayer) shake = Math.max(shake, 9);
       }
     }
   }
@@ -503,6 +522,7 @@
       r.stumbleT -= dt;
       behaviorMult *= r.stumbleMult;
     }
+    if(r.hitFlashT > 0) r.hitFlashT -= dt;
     const timing = matchTiming(r.match);
 
     if(isPlayer){
@@ -544,6 +564,8 @@
     const player = racers[0];
     document.getElementById("progressFill").style.width = Math.min(100, player.progress/TRACK_LENGTH*100) + "%";
     document.getElementById("staminaFill").style.width = Math.max(0, player.stamina*100) + "%";
+    const sprintReady = player.stamina > 0.12 && player.sprintCooldown <= 0;
+    sprintBtn.classList.toggle("cooling", !sprintReady);
 
     if(player.finished && !raceFinished){
       raceFinished = true;
@@ -572,6 +594,20 @@
       ctx.beginPath();
       ctx.ellipse(x, H*0.30, 22, 10, 0, 0, Math.PI*2);
       ctx.fill();
+    }
+
+    // stries de sol défilantes : donnent la sensation de vitesse (deux profondeurs de parallaxe)
+    ctx.strokeStyle = "rgba(150,105,45,.35)";
+    ctx.lineWidth = 3; ctx.lineCap = "round";
+    const spacingTrack = 58, offsetTrack = (bgScroll*0.9) % spacingTrack;
+    for(let x = -offsetTrack; x < W+spacingTrack; x += spacingTrack){
+      ctx.beginPath(); ctx.moveTo(x, H*0.55); ctx.lineTo(x+16, H*0.55); ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(120,80,30,.4)";
+    ctx.lineWidth = 5;
+    const spacingFront = 90, offsetFront = (bgScroll*1.6) % spacingFront;
+    for(let x = -offsetFront; x < W+spacingFront; x += spacingFront){
+      ctx.beginPath(); ctx.moveTo(x, H*0.85); ctx.lineTo(x+26, H*0.85); ctx.stroke();
     }
 
     // ligne d'arrivée (damier) si proche
@@ -649,8 +685,20 @@
     const legSwing = Math.sin(r.legPhase)*10;
     const bob = Math.abs(Math.sin(r.legPhase))*4;
 
-    // poussière
-    drawDust(screenX, y+18, isPlayer ? (r.sprintT>0?5:2) : 2);
+    // poussière : intensité liée à la vitesse réelle, pas juste au sprint
+    const speedT = Math.max(0, Math.min(1, (r.speed - REST_SPEED) / (MAX_SPEED - REST_SPEED)));
+    drawDust(screenX, y+18, Math.round(1 + speedT*5) + (isPlayer && r.sprintT>0 ? 3 : 0));
+
+    // lignes de vitesse : se voient dès qu'on va vite, pas seulement en sprint
+    if(speedT > 0.15){
+      ctx.strokeStyle = "rgba(255,255,255,"+(0.15+speedT*0.3)+")";
+      ctx.lineWidth = 2; ctx.lineCap = "round";
+      for(let i=0;i<3;i++){
+        const ly = y - bob - 6 + i*8;
+        const len = 8 + speedT*24;
+        ctx.beginPath(); ctx.moveTo(screenX-22, ly); ctx.lineTo(screenX-22-len, ly); ctx.stroke();
+      }
+    }
 
     // traînée de sprint
     if(isPlayer && r.sprintT>0){
@@ -658,6 +706,26 @@
       ctx.beginPath();
       ctx.ellipse(screenX-26, y-4-bob, 20, 8, 0, 0, Math.PI*2);
       ctx.fill();
+    }
+
+    // flash d'impact au moment où un obstacle est heurté
+    if(r.hitFlashT > 0){
+      const a = r.hitFlashT / 0.35;
+      ctx.strokeStyle = "rgba(255,255,255,"+(0.4+a*0.5)+")";
+      ctx.lineWidth = 2;
+      for(let i=0;i<5;i++){
+        const ang = (i/5)*Math.PI*2;
+        ctx.beginPath();
+        ctx.moveTo(screenX+Math.cos(ang)*10, y-14+Math.sin(ang)*10);
+        ctx.lineTo(screenX+Math.cos(ang)*(10+8*a), y-14+Math.sin(ang)*(10+8*a));
+        ctx.stroke();
+      }
+      if(isPlayer){
+        ctx.fillStyle = "rgba(184,90,80,"+(0.55+a*0.45)+")";
+        ctx.font = "bold 13px Fredoka, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Aïe !", screenX, y-34);
+      }
     }
 
     ctx.save();
@@ -742,6 +810,7 @@
   function showResults(){
     raceRunning = false;
     document.getElementById("hud").classList.add("hidden");
+    sprintBtn.classList.add("hidden");
     const ranked = [...racers].sort((a,b) => b.progress - a.progress);
     const list = document.getElementById("rankList");
     list.innerHTML = "";
@@ -761,6 +830,7 @@
   document.getElementById("startBtn").onclick = () => {
     document.getElementById("start").classList.add("hidden");
     document.getElementById("hud").classList.remove("hidden");
+    sprintBtn.classList.remove("hidden");
     resize();
     setupRace();
     raceRunning = true;
