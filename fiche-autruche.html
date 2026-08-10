@@ -93,6 +93,35 @@
   .btn-compact{padding:9px 14px;font-size:12px;flex-shrink:0;}
   .poussin-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
   .btn-accelerate{color:var(--gold-dark);border-color:var(--gold-tint);}
+
+  /* ---------- Écran paris ---------- */
+  .paris-subview.hidden{display:none;}
+  .chip.match-bon{background:var(--sage-tint);color:var(--sage-dark);}
+  .chip.match-neutre{background:var(--track);color:var(--ink-soft);}
+  .chip.match-mauvais{background:var(--pink-tint);color:var(--pink-dark);}
+  .paris-race-participants{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px;}
+  .paris-subback{margin:0 0 10px;}
+  .paris-participant-row{
+    display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;
+    border:1.5px solid var(--border);background:#fff;cursor:pointer;margin-bottom:8px;
+  }
+  .paris-participant-row.selected{border-color:var(--gold);background:var(--gold-tint);}
+  .paris-participant-name{font-family:'Fredoka',sans-serif;font-weight:600;font-size:14px;color:var(--ink);}
+  .paris-cote{font-weight:800;font-size:13px;color:var(--gold-dark);margin-left:auto;flex-shrink:0;}
+  .paris-tier-row{display:flex;gap:8px;}
+  .paris-tier-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;
+    border-radius:14px;border:1.5px solid var(--border);background:#fff;cursor:pointer;
+    font-family:'Nunito',sans-serif;
+  }
+  .paris-tier-btn.selected{border-color:var(--gold);background:var(--gold-tint);}
+  .paris-tier-label{font-size:11px;font-weight:700;color:var(--text-secondary);}
+  .paris-tier-amount{font-weight:800;font-size:13px;color:var(--ink);}
+  .paris-tier-chance{font-size:10px;color:var(--text-muted);}
+  .paris-track{display:flex;flex-direction:column;gap:12px;margin:20px 0;}
+  .paris-lane{position:relative;height:38px;background:var(--track);border-radius:12px;overflow:hidden;}
+  .paris-lane-fill{position:absolute;left:0;top:0;height:100%;width:0%;background:var(--sage-tint);transition-property:width;transition-timing-function:linear;}
+  .paris-lane-label{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:800;color:var(--ink);z-index:1;white-space:nowrap;}
   .btn:disabled{opacity:.55;cursor:default;}
   .btn:disabled:active{transform:none;}
 
@@ -549,6 +578,47 @@
     <div class="ecurie-list" id="poussiniereList"></div>
   </div>
 
+  <!-- ---------- Écran 4 : paris (Type 2, Parcours 2) ---------- -->
+  <div class="screen hidden" id="screenParis">
+    <div class="fiche-topbar">
+      <button class="back-btn" id="parisBackBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+        Hub
+      </button>
+    </div>
+
+    <div id="parisListView" class="paris-subview">
+      <div class="ecurie-header">
+        <p class="ecurie-title">Paris</p>
+        <span class="resource-pill">🪙 <span id="parisPicaillons"></span></span>
+      </div>
+      <p class="poussiniere-hint">Mise sur une autruche que tu ne contrôles pas — gain (mise × cote) si elle gagne, mise perdue sinon.</p>
+      <div class="ecurie-list" id="parisRaceList"></div>
+    </div>
+
+    <div id="parisMiseView" class="paris-subview hidden">
+      <button class="back-btn paris-subback" id="parisMiseBackBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+        Paris
+      </button>
+      <p class="ecurie-title" id="parisMiseTitle"></p>
+      <div id="parisParticipantList"></div>
+      <p class="section-label" style="margin-top:14px;">Mise</p>
+      <div class="paris-tier-row" id="parisTierRow"></div>
+      <button class="btn btn-primary" id="btnMiser" style="width:100%;margin-top:14px;" disabled>Choisis une autruche et une mise</button>
+    </div>
+
+    <div id="parisRaceView" class="paris-subview hidden">
+      <p class="ecurie-title">La course démarre…</p>
+      <div class="paris-track" id="parisTrack"></div>
+    </div>
+
+    <div id="parisResultView" class="paris-subview hidden">
+      <div class="card" id="parisResultCard"></div>
+      <button class="btn btn-outline" id="btnParisReplay" style="width:100%;margin-top:14px;">Retour aux paris</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
 </div>
@@ -642,19 +712,225 @@
 
   const HUB_RESOURCES = { picaillons:340, pepites:12 }; // monnaies mock (rapport §9.1)
 
+  // Paris (Type 2, Parcours 2) : mise réelle — perdue si l'autruche choisie ne gagne pas,
+  // sinon gain total = mise × cote (§7.3). Le tirage d'objet (§9.1) est un jet séparé, par
+  // palier de mise, indépendant du résultat de la course. Participants NPC dédiés (pas les
+  // OSTRICHES du joueur) pour ne pas mélanger cette économie avec le capital course.
+  const PARIS_COTE = { bon:1.5, neutre:2.5, mauvais:4 };
+  const MISE_TIERS = [
+    { label:"Petite", amount:10, rareChance:0.05 },
+    { label:"Moyenne", amount:50, rareChance:0.15 },
+    { label:"Grosse", amount:200, rareChance:0.30 }
+  ];
+  const ITEM_POOL = [
+    { name:"Fruits", rarity:"Rare" },
+    { name:"Graines & végétaux", rarity:"Commun" },
+    { name:"Insectes", rarity:"Rare" },
+    { name:"Cailloux (gastrolithes)", rarity:"Épique" },
+    { name:"Pierre précieuse", rarity:"Légendaire" }
+  ];
+  const PARIS_RACES = [
+    {
+      id:"course1", name:"Sprint ligne droite — Savane",
+      participants:[
+        { id:"eclair", name:"Éclair", trait:"Têtue", matching:"bon" },
+        { id:"tornade", name:"Tornade", trait:"Ambitieuse", matching:"neutre" },
+        { id:"poussiere", name:"Poussière", trait:"Parano", matching:"mauvais" }
+      ]
+    },
+    {
+      id:"course2", name:"Circuit — Désert",
+      participants:[
+        { id:"sirocco", name:"Sirocco", trait:"Ambitieuse", matching:"bon" },
+        { id:"braise", name:"Braise", trait:"Froussarde", matching:"neutre" },
+        { id:"gravier", name:"Gravier", trait:"Parano", matching:"mauvais" }
+      ]
+    }
+  ];
+  let parisSelection = { race:null, participantId:null, tierIndex:null };
+
   const screenHub = document.getElementById("screenHub");
   const screenEcurie = document.getElementById("screenEcurie");
   const screenFiche = document.getElementById("screenFiche");
   const screenPoussiniere = document.getElementById("screenPoussiniere");
+  const screenParis = document.getElementById("screenParis");
   const ostrichAvatarSvg = document.getElementById("ficheAvatarSvg").outerHTML;
 
   function showScreen(target){
-    [screenHub, screenEcurie, screenFiche, screenPoussiniere].forEach(s => s.classList.toggle("hidden", s !== target));
+    [screenHub, screenEcurie, screenFiche, screenPoussiniere, screenParis].forEach(s => s.classList.toggle("hidden", s !== target));
   }
 
   function renderHub(){
     document.getElementById("hubPicaillons").textContent = HUB_RESOURCES.picaillons;
     document.getElementById("hubPepites").textContent = HUB_RESOURCES.pepites;
+  }
+
+  const MATCH_LABEL = { bon:"Favori", neutre:"Neutre", mauvais:"Outsider" };
+
+  function showParisSubview(name){
+    ["List", "Mise", "Race", "Result"].forEach(v =>
+      document.getElementById(`paris${v}View`).classList.toggle("hidden", v.toLowerCase() !== name));
+  }
+
+  function renderParisList(){
+    document.getElementById("parisPicaillons").textContent = HUB_RESOURCES.picaillons;
+    const list = document.getElementById("parisRaceList");
+    list.innerHTML = "";
+    PARIS_RACES.forEach(race => {
+      const card = document.createElement("div");
+      card.className = "ecurie-card";
+      card.innerHTML = `
+        <div class="ecurie-info">
+          <p class="ecurie-name">${race.name}</p>
+          <div class="paris-race-participants">
+            ${race.participants.map(p => `<span class="chip match-${p.matching}">${p.name} · ${PARIS_COTE[p.matching]}x</span>`).join("")}
+          </div>
+        </div>
+        <div class="ecurie-chevron">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        </div>`;
+      card.addEventListener("click", () => openParisRace(race.id));
+      list.appendChild(card);
+    });
+  }
+
+  function openParisRace(raceId){
+    const race = PARIS_RACES.find(r => r.id === raceId);
+    if(!race) return;
+    parisSelection = { race, participantId:null, tierIndex:null };
+    document.getElementById("parisMiseTitle").textContent = race.name;
+    renderParisParticipants();
+    renderParisTiers();
+    updateMiserButton();
+    showParisSubview("mise");
+  }
+
+  function renderParisParticipants(){
+    const list = document.getElementById("parisParticipantList");
+    list.innerHTML = "";
+    parisSelection.race.participants.forEach(p => {
+      const row = document.createElement("div");
+      row.className = "paris-participant-row";
+      row.innerHTML = `
+        <span class="paris-participant-name">${p.name}</span>
+        <span class="chip trait">${p.trait}</span>
+        <span class="chip match-${p.matching}">${MATCH_LABEL[p.matching]}</span>
+        <span class="paris-cote">${PARIS_COTE[p.matching]}x</span>`;
+      row.addEventListener("click", () => {
+        parisSelection.participantId = p.id;
+        renderParisParticipants();
+        updateMiserButton();
+      });
+      if(p.id === parisSelection.participantId) row.classList.add("selected");
+      list.appendChild(row);
+    });
+  }
+
+  function renderParisTiers(){
+    const row = document.getElementById("parisTierRow");
+    row.innerHTML = "";
+    MISE_TIERS.forEach((tier, idx) => {
+      const btn = document.createElement("button");
+      btn.className = "paris-tier-btn" + (idx === parisSelection.tierIndex ? " selected" : "");
+      btn.innerHTML = `
+        <span class="paris-tier-label">${tier.label}</span>
+        <span class="paris-tier-amount">${tier.amount} 🪙</span>
+        <span class="paris-tier-chance">${Math.round(tier.rareChance*100)}% objet rare</span>`;
+      btn.addEventListener("click", () => {
+        parisSelection.tierIndex = idx;
+        renderParisTiers();
+        updateMiserButton();
+      });
+      row.appendChild(btn);
+    });
+  }
+
+  function updateMiserButton(){
+    const btn = document.getElementById("btnMiser");
+    const ready = parisSelection.participantId !== null && parisSelection.tierIndex !== null;
+    btn.disabled = !ready;
+    btn.textContent = ready
+      ? `Miser ${MISE_TIERS[parisSelection.tierIndex].amount} 🪙`
+      : "Choisis une autruche et une mise";
+  }
+
+  function placeMise(){
+    const { race, participantId, tierIndex } = parisSelection;
+    if(!race || participantId === null || tierIndex === null) return;
+    const tier = MISE_TIERS[tierIndex];
+    if(HUB_RESOURCES.picaillons < tier.amount){
+      showToast(`Pas assez de Picaillons pour miser ${tier.amount} 🪙`);
+      return;
+    }
+    HUB_RESOURCES.picaillons -= tier.amount;
+    renderHub();
+    document.getElementById("parisPicaillons").textContent = HUB_RESOURCES.picaillons;
+    showParisSubview("race");
+    const order = resolveRace(race.participants);
+    const maxDuration = playRaceAnimation(race.participants, order);
+    setTimeout(() => showParisResult(participantId, order, tier), maxDuration*1000 + 300);
+  }
+
+  // Tirage pondéré : un favori (cote basse) a plus de chances de gagner qu'un outsider,
+  // sans jamais garantir l'issue — cf. §7.3 (les cotes reflètent une probabilité, pas un
+  // classement figé).
+  function resolveRace(participants){
+    const scored = participants.map(p => ({ p, score:(1/PARIS_COTE[p.matching]) * Math.random() }));
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map(s => s.p);
+  }
+
+  function rollItem(tier){
+    if(Math.random() >= tier.rareChance) return null;
+    return ITEM_POOL[Math.floor(Math.random() * ITEM_POOL.length)];
+  }
+
+  function playRaceAnimation(participants, order){
+    const rankOf = new Map(order.map((p, i) => [p.id, i]));
+    const track = document.getElementById("parisTrack");
+    track.innerHTML = participants.map(p => `
+      <div class="paris-lane">
+        <span class="paris-lane-label">${p.name} · ${p.trait}</span>
+        <div class="paris-lane-fill" id="lane-${p.id}"></div>
+      </div>`).join("");
+    const maxDuration = 2.2 + (participants.length - 1) * 0.35;
+    requestAnimationFrame(() => {
+      participants.forEach(p => {
+        const fill = document.getElementById("lane-" + p.id);
+        fill.style.transitionDuration = (2.2 + rankOf.get(p.id) * 0.35) + "s";
+        fill.style.width = "100%";
+      });
+    });
+    return maxDuration;
+  }
+
+  function showParisResult(pickedId, order, tier){
+    const winner = order[0];
+    const picked = order.find(p => p.id === pickedId);
+    const won = pickedId === winner.id;
+    let html = "";
+    if(won){
+      const payout = Math.round(tier.amount * PARIS_COTE[picked.matching]);
+      HUB_RESOURCES.picaillons += payout;
+      html += `<p>🎉 <strong>${winner.name}</strong> gagne ! Tu remportes <strong>${payout} 🪙</strong> (mise ${tier.amount} 🪙 × ${PARIS_COTE[picked.matching]}).</p>`;
+    } else {
+      html += `<p><strong>${winner.name}</strong> l'emporte. Ta mise de ${tier.amount} 🪙 sur ${picked.name} est perdue.</p>`;
+    }
+    const item = rollItem(tier);
+    if(item){
+      html += `<p>🎁 Objet obtenu : <strong>${item.name}</strong> (${item.rarity})</p>`;
+      if(item.name === "Fruits"){
+        fruitsStock++;
+        document.getElementById("fruitsStock").textContent = fruitsStock;
+      } else if(item.name === "Graines & végétaux"){
+        grainesStock++;
+        document.getElementById("grainesStock").textContent = grainesStock;
+      }
+    }
+    document.getElementById("parisResultCard").innerHTML = html;
+    renderHub();
+    document.getElementById("parisPicaillons").textContent = HUB_RESOURCES.picaillons;
+    showParisSubview("result");
   }
 
   function ecurieCardHTML(o){
@@ -934,8 +1210,22 @@
   document.getElementById("hotspotPoussiniere").addEventListener("click", () => showScreen(screenPoussiniere));
   document.getElementById("hotspotMarche").addEventListener("click", () =>
     showToast("Marché — bientôt disponible (parcours pas encore implémenté)"));
-  document.getElementById("hotspotParier").addEventListener("click", () =>
-    showToast("Paris sur les courses — bientôt disponible (parcours pas encore implémenté)"));
+
+  document.getElementById("hotspotParier").addEventListener("click", () => {
+    showParisSubview("list");
+    renderParisList();
+    showScreen(screenParis);
+  });
+  document.getElementById("parisBackBtn").addEventListener("click", () => showScreen(screenHub));
+  document.getElementById("parisMiseBackBtn").addEventListener("click", () => {
+    showParisSubview("list");
+    renderParisList();
+  });
+  document.getElementById("btnMiser").addEventListener("click", placeMise);
+  document.getElementById("btnParisReplay").addEventListener("click", () => {
+    showParisSubview("list");
+    renderParisList();
+  });
 
   const pedigreeBtn = document.getElementById("pedigreeBtn");
   const pedigreePanel = document.getElementById("pedigreePanel");
@@ -956,6 +1246,7 @@
   renderHub();
   renderEcurieList();
   renderPoussiniereList();
+  renderParisList();
 })();
 </script>
 
